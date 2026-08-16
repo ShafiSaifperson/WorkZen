@@ -8,6 +8,7 @@ import { ApplicationsPage } from '@/pages/Applications';
 import { ResumeCoachPage } from '@/pages/ResumeCoach';
 import { CoverLetterPage } from '@/pages/CoverLetter';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { InterviewDetailPage } from '@/pages/InterviewDetail';
 
 function ProtectedRoutes() {
   const { user, signOut } = useAuth();
@@ -22,6 +23,7 @@ function ProtectedRoutes() {
           <Route path="jobs" element={<JobsPage />} />
           <Route path="jobs/:jobId" element={<JobDetailPage />} />
           <Route path="applications" element={<ApplicationsPage />} />
+          <Route path="interviews/:interviewId" element={<InterviewDetailPage />} />
           <Route path="resume-coach" element={<ResumeCoachPage />} />
           <Route path="cover-letter" element={<CoverLetterPage />} />
         </Route>

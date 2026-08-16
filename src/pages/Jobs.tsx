@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import {
+import { Link, useSearchParams } from 'react-router-dom';import {
   Search,
   SlidersHorizontal,
   Sparkles,
@@ -20,8 +19,8 @@ const jobTypes = ['Full-time', 'Part-time', 'Internship', 'Contract'];
 
 export function JobsPage() {
   const { user } = useAuth();
-  const [query, setQuery] = useState('');
-  const [type, setType] = useState<string[]>([]);
+    const [searchParams] = useSearchParams();
+const [query, setQuery] = useState(() => searchParams.get('q') ?? '');  const [type, setType] = useState<string[]>([]);
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [minSalary, setMinSalary] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
@@ -32,6 +31,9 @@ export function JobsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [applying, setApplying] = useState<string | null>(null);
+    useEffect(() => {
+    setQuery(searchParams.get('q') ?? '');
+  }, [searchParams]);
 
   useEffect(() => {
     if (!user) return;

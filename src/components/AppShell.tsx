@@ -1,5 +1,5 @@
-import { NavLink, Outlet } from 'react-router-dom';
-import {
+import { useState, type FormEvent } from 'react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';import {
   LayoutDashboard,
   Briefcase,
   FileText,
@@ -36,6 +36,18 @@ export function AppShell({ user, onSignOut }: AppShellProps) {
   const fullName = user.full_name || '';
   const email = user.email ?? '';
   const initials = getInitials(fullName, email);
+    const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = useState('');
+
+function submitSearch(event: FormEvent<HTMLFormElement>) {    event.preventDefault();
+    const trimmedQuery = searchQuery.trim();
+
+    navigate(
+      trimmedQuery
+        ? `/app/jobs?q=${encodeURIComponent(trimmedQuery)}`
+        : '/app/jobs'
+    );
+  }
 
   return (
     <div className="min-h-screen bg-ink-50">
@@ -116,13 +128,16 @@ export function AppShell({ user, onSignOut }: AppShellProps) {
       <div className="lg:pl-64">
         {/* Desktop top bar */}
         <header className="sticky top-0 z-30 hidden items-center justify-between border-b border-ink-200 bg-white/80 px-8 py-4 backdrop-blur lg:flex">
-          <div className="relative w-72">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-            <input
-              placeholder="Search jobs, companies…"
-              className="h-10 w-full rounded-xl border border-ink-200 bg-ink-50 pl-11 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100"
-            />
-          </div>
+          <form onSubmit={submitSearch} className="relative w-72">
+  <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+  <input
+    value={searchQuery}
+    onChange={(event) => setSearchQuery(event.target.value)}
+    placeholder="Search jobs, companies…"
+    aria-label="Search jobs and companies"
+    className="h-10 w-full rounded-xl border border-ink-200 bg-ink-50 pl-11 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100"
+  />
+</form>
           <div className="flex items-center gap-3">
             <button className="relative rounded-xl p-2.5 text-ink-500 transition hover:bg-ink-100">
               <Bell className="h-5 w-5" />

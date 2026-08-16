@@ -54,6 +54,7 @@ export async function fetchInterviews(userId: string): Promise<Interview[]> {
   );
   return (result.rows as any[]).map((row) => ({
     id: row.id,
+    jobId: row.job_id,
     jobTitle: row.job_title,
     company: row.company,
     date: row.date,
@@ -64,7 +65,36 @@ export async function fetchInterviews(userId: string): Promise<Interview[]> {
     inDays: row.in_days,
   }));
 }
+export async function fetchInterviewById(
+  userId: string,
+  interviewId: string
+): Promise<Interview | null> {
+  const db = await getDb();
+  const result = await db.query(
+    `SELECT i.*, j.title AS job_title, j.company
+     FROM interviews i
+     JOIN jobs j ON i.job_id = j.id
+     WHERE i.id = $1 AND i.user_id = $2`,
+    [interviewId, userId]
+  );
 
+  if (result.rows.length === 0) return null;
+
+  const row = result.rows[0] as any;
+
+  return {
+    id: row.id,
+    jobId: row.job_id,
+    jobTitle: row.job_title,
+    company: row.company,
+    date: row.date,
+    time: row.time,
+    format: row.format,
+    withName: row.with_name,
+    withRole: row.with_role,
+    inDays: row.in_days,
+  };
+}
 function mapJob(row: any): Job {
   return mapJobFromRow(row);
 }

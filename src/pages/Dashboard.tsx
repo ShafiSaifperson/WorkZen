@@ -217,10 +217,12 @@ export function DashboardPage() {
             {interviews.map((iv) => {
               const FormatIcon = formatIcons[iv.format] ?? Video;
               return (
-                <div
-                  key={iv.id}
-                  className="group rounded-xl border border-ink-200 bg-white p-4 transition hover:border-brand-300 hover:shadow-soft"
+                <Link
+              key={iv.id}
+              to={`/app/interviews/${iv.id}`}
+              className="group rounded-xl border border-ink-200 bg-white p-4 transition hover:border-brand-300 hover:shadow-soft"
                 >
+                  
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-bold text-ink-900">{iv.jobTitle}</p>
@@ -251,7 +253,7 @@ export function DashboardPage() {
                       with {iv.withName} · {iv.withRole}
                     </p>
                   </div>
-                </div>
+                                </Link>
               );
             })}
           </div>

@@ -31,6 +31,7 @@ export interface Application {
 
 export interface Interview {
   id: string;
+  jobId: string;
   jobTitle: string;
   company: string;
   date: string;
