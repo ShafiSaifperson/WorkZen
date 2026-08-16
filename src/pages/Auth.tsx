@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { Logo } from '@/components/ui/Logo';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/lib/auth';
+import { signInWithFacebook, signInWithGoogle } from '@/lib/socialAuth';
 
 interface AuthShellProps {
   title: string;
@@ -98,12 +99,45 @@ function ErrorBanner({ message }: { message: string | null }) {
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+
+
+  /*const { signIn } = useAuth();*/
+
+
+  const { signIn, signInWithOAuthProfile } = useAuth();
   const [showPw, setShowPw] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  async function handleGoogleSignIn() {
+  setError(null);
+  setSubmitting(true);
+
+  try {
+    await signInWithOAuthProfile(await signInWithGoogle());
+    navigate('/app/dashboard');
+  } catch (err) {
+    setError((err as Error).message);
+  } finally {
+    setSubmitting(false);
+  }
+}
+
+async function handleFacebookSignIn() {
+  setError(null);
+  setSubmitting(true);
+
+  try {
+    await signInWithOAuthProfile(await signInWithFacebook());
+    navigate('/app/dashboard');
+  } catch (err) {
+    setError((err as Error).message);
+  } finally {
+    setSubmitting(false);
+  }
+}
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -139,6 +173,33 @@ export function LoginPage() {
       }
     >
       <ErrorBanner message={error} />
+      <div className="grid grid-cols-2 gap-3">
+  <Button
+    type="button"
+    variant="outline"
+    className="w-full"
+    disabled={submitting}
+    onClick={handleGoogleSignIn}
+  >
+    Google
+  </Button>
+
+  <Button
+    type="button"
+    variant="outline"
+    className="w-full"
+    disabled={submitting}
+    onClick={handleFacebookSignIn}
+  >
+    Facebook
+  </Button>
+</div>
+
+<div className="flex items-center gap-3 text-xs text-ink-400">
+  <span className="h-px flex-1 bg-ink-200" />
+  or continue with email
+  <span className="h-px flex-1 bg-ink-200" />
+</div>
       <div>
         <label className="mb-1.5 block text-sm font-medium text-ink-700">Email</label>
         <div className="relative">
