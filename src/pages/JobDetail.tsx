@@ -11,9 +11,8 @@ import {
   AlertCircle,
   Building2,
   Globe,
-  Users,
 } from 'lucide-react';
-import { fetchJobById, fetchAppliedJobIds, applyToJob } from '@/lib/data';
+import { fetchJobById, fetchAppliedJobIds } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
 import type { Job } from '@/lib/types';
 import { ApplyNextStepsModal } from '@/components/ApplyNextStepsModal';
@@ -26,8 +25,8 @@ export function JobDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [applied, setApplied] = useState(false);
-  const [applying, setApplying] = useState(false);
   const [showApplyNextSteps, setShowApplyNextSteps] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!jobId || !user) return;
@@ -40,19 +39,12 @@ export function JobDetailPage() {
       .finally(() => setLoading(false));
   }, [jobId, user]);
 
-  async function apply() {
-    if (!jobId || !user) return;
-    setApplying(true);
-    try {
-      await applyToJob(user.id, jobId);
-      setApplied(true);
-setShowApplyNextSteps(true);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setApplying(false);
-    }
-  }
+  function openApplicationOptions() {
+  if (!jobId) return;
+
+  setSelectedJobId(jobId);
+  setShowApplyNextSteps(true);
+}
 
   if (loading) {
     return (
@@ -151,17 +143,10 @@ setShowApplyNextSteps(true);
             </div>
           ) : (
             <button
-              onClick={apply}
-              disabled={applying}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-6 py-3.5 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700 disabled:opacity-60 sm:w-auto"
-            >
-              {applying ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <>
-                  <Briefcase className="h-4 w-4" /> Apply now
-                </>
-              )}
+              onClick={openApplicationOptions}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-6 py-3.5 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700 sm:w-auto"
+>
+  <Briefcase className="h-4 w-4" /> Apply now
             </button>
           )}
         </div>
@@ -193,9 +178,10 @@ setShowApplyNextSteps(true);
         </div>
       </div>
             <ApplyNextStepsModal
-        isOpen={showApplyNextSteps}
-        onClose={() => setShowApplyNextSteps(false)}
-      />
+  isOpen={showApplyNextSteps}
+  jobId={selectedJobId}
+  onClose={() => setShowApplyNextSteps(false)}
+/>
     </div>
   );
 }

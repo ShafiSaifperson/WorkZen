@@ -1,16 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
-import {
+import { useSearchParams } from 'react-router-dom';import {
   Upload,
   FileText,
-  Sparkles,
   Send,
   Loader2,
   Settings,
   RefreshCw,
-  MessageSquare,
   Bot,
   User,
-  CheckCircle2,
   FileUp,
 } from 'lucide-react';
 import type { ChatMessage, AtsReport, ResumeData } from '@/lib/types';
@@ -24,6 +21,9 @@ import {
 import { extractTextFromFile, SAMPLE_RESUMES } from '@/lib/resumeParser';
 import { ResumeReportCard } from '@/components/ResumeReportCard';
 import { HfSettingsModal } from '@/components/HfSettingsModal';
+import { useAuth } from '@/lib/auth';
+import { applyToJob, fetchAppliedJobIds, fetchJobById } from '@/lib/data';
+import type { Job } from '@/lib/types';
 
 const QUICK_PROMPTS = [
   '✨ Rewrite my weakest bullet with metrics',
@@ -48,6 +48,13 @@ export function ResumeCoachPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [targetRole, setTargetRole] = useState(getStoredTargetRole());
   const [activeTab, setActiveTab] = useState<'report' | 'text'>('report');
+    const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [selectedJobLoading, setSelectedJobLoading] = useState(true);
+  const [alreadyApplied, setAlreadyApplied] = useState(false);
+  const [applyingForSelectedJob, setApplyingForSelectedJob] = useState(false);
+  const [applicationMessage, setApplicationMessage] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -55,6 +62,41 @@ export function ResumeCoachPage() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, analyzing, chatLoading]);
+    useEffect(() => {
+    const jobId = searchParams.get('jobId');
+
+    if (!jobId || !user) {
+      setSelectedJobLoading(false);
+      return;
+    }
+
+    Promise.all([fetchJobById(jobId), fetchAppliedJobIds(user.id)])
+      .then(([job, appliedJobIds]) => {
+        setSelectedJob(job);
+        setAlreadyApplied(appliedJobIds.includes(jobId));
+      })
+      .catch(() => {
+        setApplicationMessage('The selected job could not be loaded.');
+      })
+      .finally(() => setSelectedJobLoading(false));
+  }, [searchParams, user]);
+
+  async function applyForSelectedJob() {
+    if (!user || !selectedJob || alreadyApplied) return;
+
+    setApplyingForSelectedJob(true);
+    setApplicationMessage(null);
+
+    try {
+      await applyToJob(user.id, selectedJob.id);
+      setAlreadyApplied(true);
+      setApplicationMessage(`You successfully applied for ${selectedJob.title}.`);
+    } catch (error) {
+      setApplicationMessage((error as Error).message);
+    } finally {
+      setApplyingForSelectedJob(false);
+    }
+  }
 
   // Handle Resume Upload & Analysis
   async function processResume(rawText: string, fileName: string, fileSize: string) {
@@ -156,7 +198,39 @@ export function ResumeCoachPage() {
           </button>
         </div>
       </div>
+            {!selectedJobLoading && selectedJob && (
+        <div className="mb-6 rounded-2xl border border-brand-200 bg-brand-50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">
+            Selected job
+          </p>
 
+          <h2 className="mt-1 font-display text-lg font-bold text-ink-900">
+            {selectedJob.title}
+          </h2>
+
+          <p className="mt-1 text-sm text-ink-600">
+            {selectedJob.company}
+          </p>
+
+          <button
+            onClick={applyForSelectedJob}
+            disabled={alreadyApplied || applyingForSelectedJob}
+            className="mt-4 inline-flex items-center rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {applyingForSelectedJob
+              ? 'Applying...'
+              : alreadyApplied
+                ? 'Already Applied'
+                : 'Apply'}
+          </button>
+
+          {applicationMessage && (
+            <p className="mt-3 text-sm font-medium text-ink-700">
+              {applicationMessage}
+            </p>
+          )}
+        </div>
+      )}
       <div className="grid gap-6 lg:grid-cols-12">
         {/* Left Column: Interactive Chatbot */}
         <div className="lg:col-span-7 flex flex-col">

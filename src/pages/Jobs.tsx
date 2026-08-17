@@ -11,8 +11,7 @@ import { Link, useSearchParams } from 'react-router-dom';import {
   ArrowRight,
   AlertCircle,
 } from 'lucide-react';
-import { fetchJobs, fetchAppliedJobIds, applyToJob } from '@/lib/data';
-import { useAuth } from '@/lib/auth';
+import { fetchJobs, fetchAppliedJobIds } from '@/lib/data';import { useAuth } from '@/lib/auth';
 import type { Job } from '@/lib/types';
 import { ApplyNextStepsModal } from '@/components/ApplyNextStepsModal';
 
@@ -31,8 +30,8 @@ const [query, setQuery] = useState(() => searchParams.get('q') ?? '');  const [t
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [applying, setApplying] = useState<string | null>(null);
   const [showApplyNextSteps, setShowApplyNextSteps] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
     useEffect(() => {
     setQuery(searchParams.get('q') ?? '');
   }, [searchParams]);
@@ -84,19 +83,10 @@ const [query, setQuery] = useState(() => searchParams.get('q') ?? '');  const [t
     setAiResults(null);
   }
 
-  async function apply(jobId: string) {
-    if (!user) return;
-    setApplying(jobId);
-    try {
-      await applyToJob(user.id, jobId);
-      setAppliedIds((prev) => [...prev, jobId]);
-setShowApplyNextSteps(true);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setApplying(null);
-    }
-  }
+function openApplicationOptions(jobId: string) {
+  setSelectedJobId(jobId);
+  setShowApplyNextSteps(true);
+}
 
   const activeFilterCount = type.length + (remoteOnly ? 1 : 0) + (minSalary > 0 ? 1 : 0);
 
@@ -349,18 +339,11 @@ setShowApplyNextSteps(true);
                       <button
                         onClick={(e) => {
                           e.preventDefault();
-                          apply(job.id);
+                          openApplicationOptions(job.id);
                         }}
-                        disabled={applying === job.id}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
-                      >
-                        {applying === job.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <>
-                            Apply now <ArrowRight className="h-4 w-4" />
-                          </>
-                        )}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+>
+  Apply now <ArrowRight className="h-4 w-4" />
                       </button>
                     )}
                   </div>
@@ -376,10 +359,11 @@ setShowApplyNextSteps(true);
           )}
         </>
       )}
-            <ApplyNextStepsModal
-        isOpen={showApplyNextSteps}
-        onClose={() => setShowApplyNextSteps(false)}
-      />
+           <ApplyNextStepsModal
+  isOpen={showApplyNextSteps}
+  jobId={selectedJobId}
+  onClose={() => setShowApplyNextSteps(false)}
+/>
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { JobDetailPage } from '@/pages/JobDetail';
 import { ApplicationsPage } from '@/pages/Applications';
 import { ResumeCoachPage } from '@/pages/ResumeCoach';
 import { CoverLetterPage } from '@/pages/CoverLetter';
-import { AuthProvider, useAuth } from '@/lib/auth';
+import { useAuth } from '@/lib/auth';
 import { InterviewDetailPage } from '@/pages/InterviewDetail';
 
 function ProtectedRoutes() {

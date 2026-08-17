@@ -7,11 +7,10 @@ import {
     ChevronDown,
     ChevronUp,
     Target,
-    FileCheck2,
     Copy,
     Check,
 } from 'lucide-react';
-import type { AtsReport, AtsSuggestion } from '@/lib/types';
+import type { AtsReport } from '@/lib/types';
 
 interface ResumeReportCardProps {
     report: AtsReport;
