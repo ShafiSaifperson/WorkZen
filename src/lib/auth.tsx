@@ -51,10 +51,36 @@ export function signOut(): void {
   localStorage.removeItem('workzen-user');
 }
 
+export interface OAuthProfile {
+  provider: string;
+  providerUserId: string;
+  email: string;
+  fullName: string;
+}
+
+export async function signInWithOAuth(profile: OAuthProfile): Promise<AuthUser> {
+  const db = await getDb();
+  const existing = await db.query('SELECT id, email, full_name FROM users WHERE email = $1', [profile.email.toLowerCase().trim()]);
+  if (existing.rows.length > 0) {
+    const user = existing.rows[0] as AuthUser;
+    localStorage.setItem('workzen-user', JSON.stringify(user));
+    return user;
+  }
+  const id = 'u' + Date.now();
+  await db.query(
+    'INSERT INTO users (id, email, password, full_name) VALUES ($1, $2, $3, $4)',
+    [id, profile.email.toLowerCase().trim(), 'oauth_account', profile.fullName || profile.email.split('@')[0]]
+  );
+  const user: AuthUser = { id, email: profile.email.toLowerCase().trim(), full_name: profile.fullName || profile.email.split('@')[0] };
+  localStorage.setItem('workzen-user', JSON.stringify(user));
+  return user;
+}
+
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<AuthUser>;
+  signInWithOAuthProfile: (profile: OAuthProfile) => Promise<AuthUser>;
   signUp: (email: string, password: string, fullName: string) => Promise<AuthUser>;
   signOut: () => void;
 }
@@ -63,6 +89,7 @@ const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: true,
   signIn: async () => { throw new Error('AuthProvider not mounted'); },
+  signInWithOAuthProfile: async () => { throw new Error('AuthProvider not mounted'); },
   signUp: async () => { throw new Error('AuthProvider not mounted'); },
   signOut: () => {},
 });
@@ -98,6 +125,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return u;
   }
 
+  async function handleSignInWithOAuthProfile(profile: OAuthProfile) {
+    const u = await signInWithOAuth(profile);
+    setUser(u);
+    return u;
+  }
+
   async function handleSignUp(email: string, password: string, fullName: string) {
     const u = await signUp(email, password, fullName);
     setUser(u);
@@ -111,7 +144,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, signIn: handleSignIn, signUp: handleSignUp, signOut: handleSignOut }}
+      value={{
+        user,
+        loading,
+        signIn: handleSignIn,
+        signInWithOAuthProfile: handleSignInWithOAuthProfile,
+        signUp: handleSignUp,
+        signOut: handleSignOut,
+      }}
     >
       {children}
     </AuthContext.Provider>

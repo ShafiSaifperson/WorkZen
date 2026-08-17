@@ -46,4 +46,47 @@ export interface ChatMessage {
   id: string;
   role: 'user' | 'ai';
   text: string;
+  timestamp?: string;
+  isReport?: boolean;
+}
+
+export interface AtsCategoryScore {
+  name: string;
+  score: number; // 0-100
+  weight: number;
+  status: 'good' | 'warn' | 'crit';
+  feedback: string;
+}
+
+export interface AtsSuggestion {
+  id: string;
+  category: 'Impact' | 'Skills' | 'Formatting' | 'Summary' | 'Structure';
+  type: 'crit' | 'warn' | 'good';
+  title: string;
+  originalText?: string;
+  suggestedRewrite?: string;
+  explanation: string;
+}
+
+export interface AtsReport {
+  overallScore: number;
+  targetRole: string;
+  summary: string;
+  categoryScores: AtsCategoryScore[];
+  detectedSkills: string[];
+  missingKeywords: string[];
+  suggestions: AtsSuggestion[];
+  stats: {
+    wordCount: number;
+    bulletCount: number;
+    metricsCount: number;
+    actionVerbsCount: number;
+  };
+}
+
+export interface ResumeData {
+  fileName: string;
+  fileSize: string;
+  rawText: string;
+  uploadedAt: string;
 }
