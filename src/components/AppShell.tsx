@@ -8,6 +8,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';import {
   Search,
   Bell,
   ChevronDown,
+  Building2,
 } from 'lucide-react';
 import type { AuthUser } from '@/lib/auth';
 import { Logo } from '@/components/ui/Logo';
@@ -17,11 +18,15 @@ interface AppShellProps {
   onSignOut: () => void;
 }
 
-const nav = [
+const candidateNav = [
   { to: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/app/jobs', label: 'Find Jobs', icon: Briefcase },
   { to: '/app/resume-coach', label: 'Resume Coach', icon: FileText },
   { to: '/app/cover-letter', label: 'Cover Letter', icon: PenLine },
+];
+
+const companyNav = [
+  { to: '/company/dashboard', label: 'Hiring Dashboard', icon: Building2 },
 ];
 
 function getInitials(name: string, email: string) {
@@ -38,6 +43,7 @@ export function AppShell({ user, onSignOut }: AppShellProps) {
   const initials = getInitials(fullName, email);
     const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const nav = user.role === 'company' ? companyNav : candidateNav;
 
 function submitSearch(event: FormEvent<HTMLFormElement>) {    event.preventDefault();
     const trimmedQuery = searchQuery.trim();

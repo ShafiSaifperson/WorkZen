@@ -6,8 +6,19 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT UNIQUE NOT NULL,
   password TEXT NOT NULL,
   full_name TEXT NOT NULL DEFAULT '',
+  role TEXT NOT NULL DEFAULT 'candidate',
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS user_identities (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  provider TEXT NOT NULL,
+  provider_user_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (provider, provider_user_id)
+);
+
 
 CREATE TABLE IF NOT EXISTS jobs (
   id TEXT PRIMARY KEY,
@@ -22,6 +33,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   salary_max INTEGER NOT NULL DEFAULT 0,
   tags TEXT[] NOT NULL DEFAULT '{}',
   posted_days_ago INTEGER NOT NULL DEFAULT 0,
+  company_id TEXT REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -57,8 +69,12 @@ CREATE TABLE IF NOT EXISTS cover_letters (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'candidate';
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS company_id TEXT REFERENCES users(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_applications_user_id ON applications(user_id);
 CREATE INDEX IF NOT EXISTS idx_interviews_user_id ON interviews(user_id);
+CREATE INDEX IF NOT EXISTS idx_jobs_company_id ON jobs(company_id);
+CREATE INDEX IF NOT EXISTS idx_user_identities_user_id ON user_identities(user_id);
 `;
 
 const JOB_SEED = `
@@ -73,14 +89,21 @@ INSERT INTO jobs (id, title, company, logo, location, description, remote, type,
   ('j8', 'UX Research Intern', 'Pathway Health', 'PH', 'Boston, MA', 'You will partner with cross-functional teams to ship delightful product experiences. We value ownership, craft, and a bias for action. This is a high-impact role with clear room to grow.', false, 'Internship', 32, 40, ARRAY['Interviews','Usability','Synthesis'], 8)
 ON CONFLICT (id) DO NOTHING;
 `;
-
+/*
 const USER_SEED = `
 INSERT INTO users (id, email, password, full_name) VALUES
   ('u1', 'alex@workzen.app', 'workzen123', 'Alex Kim'),
   ('u2', 'demo@workzen.app', 'workzen123', 'Demo User')
 ON CONFLICT (id) DO NOTHING;
 `;
-
+*/
+const USER_SEED = `
+INSERT INTO users (id, email, password, full_name, role) VALUES
+  ('u1', 'alex@workzen.app', 'workzen123', 'Alex Kim', 'candidate'),
+  ('u2', 'demo@workzen.app', 'workzen123', 'Demo User', 'candidate'),
+  ('u-company', 'company@workzen.app', 'company123', 'WorkZen Hiring Team', 'company')
+ON CONFLICT (id) DO UPDATE SET role = EXCLUDED.role;
+`;
 const APP_SEED = `
 INSERT INTO applications (id, user_id, job_id, status, applied_days_ago) VALUES
   ('a1', 'u1', 'j1', 'pending', 2),

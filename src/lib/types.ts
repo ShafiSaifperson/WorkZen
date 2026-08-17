@@ -19,6 +19,7 @@ export interface Job {
   postedDaysAgo: number;
   tags: string[];
   description: string;
+  companyId?: string | null;
   match?: number;
 }
 
@@ -89,4 +90,25 @@ export interface ResumeData {
   fileSize: string;
   rawText: string;
   uploadedAt: string;
+}
+export interface JobInput {
+  title: string;
+  company: string;
+  logo: string;
+  location: string;
+  description: string;
+  remote: boolean;
+  type: Job['type'];
+  salaryMin: number;
+  salaryMax: number;
+  tags: string[];
+}
+
+export interface CompanyApplication {
+  id: string;
+  status: AppStatus;
+  appliedDaysAgo: number;
+  candidateName: string;
+  candidateEmail: string;
+  job: Job;
 }

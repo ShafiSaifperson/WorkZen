@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from '@/components/AppShell';
 import { LoginPage, SignupPage } from '@/pages/Auth';
 import { DashboardPage } from '@/pages/Dashboard';
@@ -9,10 +9,11 @@ import { ResumeCoachPage } from '@/pages/ResumeCoach';
 import { CoverLetterPage } from '@/pages/CoverLetter';
 import { useAuth } from '@/lib/auth';
 import { InterviewDetailPage } from '@/pages/InterviewDetail';
+import { CompanyDashboardPage } from '@/pages/CompanyDashboard';
+import { AuthProvider, useAuth } from '@/lib/auth';
 
-function ProtectedRoutes() {
+function CandidateRoutes() {
   const { user, signOut } = useAuth();
-
   if (!user) return <Navigate to="/login" replace />;
 
   return (
@@ -33,6 +34,22 @@ function ProtectedRoutes() {
   );
 }
 
+function CompanyRoutes() {
+  const { user, signOut } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/company" element={<AppShell user={user} onSignOut={signOut} />}>
+          <Route path="dashboard" element={<CompanyDashboardPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/company/dashboard" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
 function PublicRoutes() {
   return (
     <BrowserRouter>
@@ -45,7 +62,7 @@ function PublicRoutes() {
   );
 }
 
-export default function App() {
+function AppContent() {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -56,5 +73,14 @@ export default function App() {
     );
   }
 
-  return user ? <ProtectedRoutes /> : <PublicRoutes />;
+  if (!user) return <PublicRoutes />;
+  return user.role === 'company' ? <CompanyRoutes /> : <CandidateRoutes />;
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
 }
