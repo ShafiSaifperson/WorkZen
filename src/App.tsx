@@ -7,7 +7,6 @@ import { JobDetailPage } from '@/pages/JobDetail';
 import { ApplicationsPage } from '@/pages/Applications';
 import { ResumeCoachPage } from '@/pages/ResumeCoach';
 import { CoverLetterPage } from '@/pages/CoverLetter';
-import { useAuth } from '@/lib/auth';
 import { InterviewDetailPage } from '@/pages/InterviewDetail';
 import { CompanyDashboardPage } from '@/pages/CompanyDashboard';
 import { AuthProvider, useAuth } from '@/lib/auth';
