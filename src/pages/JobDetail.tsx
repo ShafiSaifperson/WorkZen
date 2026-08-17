@@ -16,6 +16,7 @@ import {
 import { fetchJobById, fetchAppliedJobIds, applyToJob } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
 import type { Job } from '@/lib/types';
+import { ApplyNextStepsModal } from '@/components/ApplyNextStepsModal';
 
 export function JobDetailPage() {
   const { jobId } = useParams<{ jobId: string }>();
@@ -26,6 +27,7 @@ export function JobDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [applied, setApplied] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [showApplyNextSteps, setShowApplyNextSteps] = useState(false);
 
   useEffect(() => {
     if (!jobId || !user) return;
@@ -44,6 +46,7 @@ export function JobDetailPage() {
     try {
       await applyToJob(user.id, jobId);
       setApplied(true);
+setShowApplyNextSteps(true);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -189,6 +192,10 @@ export function JobDetailPage() {
           </p>
         </div>
       </div>
+            <ApplyNextStepsModal
+        isOpen={showApplyNextSteps}
+        onClose={() => setShowApplyNextSteps(false)}
+      />
     </div>
   );
 }

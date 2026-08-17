@@ -14,6 +14,7 @@ import { Link, useSearchParams } from 'react-router-dom';import {
 import { fetchJobs, fetchAppliedJobIds, applyToJob } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
 import type { Job } from '@/lib/types';
+import { ApplyNextStepsModal } from '@/components/ApplyNextStepsModal';
 
 const jobTypes = ['Full-time', 'Part-time', 'Internship', 'Contract'];
 
@@ -31,6 +32,7 @@ const [query, setQuery] = useState(() => searchParams.get('q') ?? '');  const [t
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [applying, setApplying] = useState<string | null>(null);
+  const [showApplyNextSteps, setShowApplyNextSteps] = useState(false);
     useEffect(() => {
     setQuery(searchParams.get('q') ?? '');
   }, [searchParams]);
@@ -88,6 +90,7 @@ const [query, setQuery] = useState(() => searchParams.get('q') ?? '');  const [t
     try {
       await applyToJob(user.id, jobId);
       setAppliedIds((prev) => [...prev, jobId]);
+setShowApplyNextSteps(true);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -373,6 +376,10 @@ const [query, setQuery] = useState(() => searchParams.get('q') ?? '');  const [t
           )}
         </>
       )}
+            <ApplyNextStepsModal
+        isOpen={showApplyNextSteps}
+        onClose={() => setShowApplyNextSteps(false)}
+      />
     </div>
   );
 }
