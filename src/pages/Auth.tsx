@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, Loader2, AlertCircle, Building2, User, Briefcase } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { Logo } from '@/components/ui/Logo';
 import { Button } from '@/components/ui/Button';
@@ -99,11 +99,6 @@ function ErrorBanner({ message }: { message: string | null }) {
 
 export function LoginPage() {
   const navigate = useNavigate();
-
-
-  /*const { signIn } = useAuth();*/
-
-
   const { signIn, signInWithOAuthProfile } = useAuth();
   const [showPw, setShowPw] = useState(false);
   const [email, setEmail] = useState('');
@@ -112,40 +107,52 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   async function handleGoogleSignIn() {
-  setError(null);
-  setSubmitting(true);
+    setError(null);
+    setSubmitting(true);
 
-  try {
-    await signInWithOAuthProfile(await signInWithGoogle());
-    navigate('/app/dashboard');
-  } catch (err) {
-    setError((err as Error).message);
-  } finally {
-    setSubmitting(false);
+    try {
+      const user = await signInWithOAuthProfile(await signInWithGoogle());
+      if (user.role === 'company') {
+        navigate('/company/dashboard');
+      } else {
+        navigate('/app/dashboard');
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
   }
-}
 
-async function handleFacebookSignIn() {
-  setError(null);
-  setSubmitting(true);
+  async function handleFacebookSignIn() {
+    setError(null);
+    setSubmitting(true);
 
-  try {
-    await signInWithOAuthProfile(await signInWithFacebook());
-    navigate('/app/dashboard');
-  } catch (err) {
-    setError((err as Error).message);
-  } finally {
-    setSubmitting(false);
+    try {
+      const user = await signInWithOAuthProfile(await signInWithFacebook());
+      if (user.role === 'company') {
+        navigate('/company/dashboard');
+      } else {
+        navigate('/app/dashboard');
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
   }
-}
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
     try {
-      await signIn(email, password);
-      navigate('/app/dashboard');
+      const user = await signIn(email, password);
+      if (user.role === 'company') {
+        navigate('/company/dashboard');
+      } else {
+        navigate('/app/dashboard');
+      }
     } catch (err) {
       const msg = (err as Error).message;
       setError(msg === 'Invalid login credentials'
@@ -174,32 +181,32 @@ async function handleFacebookSignIn() {
     >
       <ErrorBanner message={error} />
       <div className="grid grid-cols-2 gap-3">
-  <Button
-    type="button"
-    variant="outline"
-    className="w-full"
-    disabled={submitting}
-    onClick={handleGoogleSignIn}
-  >
-    Google
-  </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          disabled={submitting}
+          onClick={handleGoogleSignIn}
+        >
+          Google
+        </Button>
 
-  <Button
-    type="button"
-    variant="outline"
-    className="w-full"
-    disabled={submitting}
-    onClick={handleFacebookSignIn}
-  >
-    Facebook
-  </Button>
-</div>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          disabled={submitting}
+          onClick={handleFacebookSignIn}
+        >
+          Facebook
+        </Button>
+      </div>
 
-<div className="flex items-center gap-3 text-xs text-ink-400">
-  <span className="h-px flex-1 bg-ink-200" />
-  or continue with email
-  <span className="h-px flex-1 bg-ink-200" />
-</div>
+      <div className="flex items-center gap-3 text-xs text-ink-400">
+        <span className="h-px flex-1 bg-ink-200" />
+        or continue with email
+        <span className="h-px flex-1 bg-ink-200" />
+      </div>
       <div>
         <label className="mb-1.5 block text-sm font-medium text-ink-700">Email</label>
         <div className="relative">
@@ -247,9 +254,12 @@ async function handleFacebookSignIn() {
 export function SignupPage() {
   const navigate = useNavigate();
   const { signUp } = useAuth();
+  const [accountType, setAccountType] = useState<'candidate' | 'company'>('candidate');
   const [showPw, setShowPw] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [ownerName, setOwnerName] = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -264,8 +274,18 @@ export function SignupPage() {
     }
     setSubmitting(true);
     try {
-      await signUp(email, password, `${firstName} ${lastName}`.trim());
-      navigate('/app/dashboard');
+      if (accountType === 'company') {
+        if (!companyName.trim()) {
+          setError('Please provide a valid company name.');
+          setSubmitting(false);
+          return;
+        }
+        await signUp(email, password, companyName.trim(), 'company');
+        navigate('/company/dashboard');
+      } else {
+        await signUp(email, password, `${firstName} ${lastName}`.trim(), 'candidate');
+        navigate('/app/dashboard');
+      }
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -275,9 +295,13 @@ export function SignupPage() {
 
   return (
     <AuthShell
-      title="Create your account"
-      subtitle="Start tracking applications in under a minute."
-      primaryLabel="Create account"
+      title={accountType === 'company' ? 'Register your company' : 'Create your account'}
+      subtitle={
+        accountType === 'company'
+          ? 'Post jobs, review applicants, and hire talent.'
+          : 'Start tracking applications in under a minute.'
+      }
+      primaryLabel={accountType === 'company' ? 'Create company account' : 'Create account'}
       onPrimary={handleSubmit}
       submitting={submitting}
       footer={
@@ -290,30 +314,97 @@ export function SignupPage() {
       }
     >
       <ErrorBanner message={error} />
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-ink-700">First name</label>
-          <input
-            required
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            className="h-12 w-full rounded-xl border border-ink-200 bg-white px-4 text-sm text-ink-900 shadow-soft outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
-            placeholder="Alex"
-          />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-ink-700">Last name</label>
-          <input
-            required
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            className="h-12 w-full rounded-xl border border-ink-200 bg-white px-4 text-sm text-ink-900 shadow-soft outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
-            placeholder="Kim"
-          />
-        </div>
+
+      {/* Account Type Selector */}
+      <div className="grid grid-cols-2 rounded-xl bg-ink-100 p-1">
+        <button
+          type="button"
+          onClick={() => {
+            setAccountType('candidate');
+            setError(null);
+          }}
+          className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition ${accountType === 'candidate'
+              ? 'bg-white text-ink-900 shadow-soft'
+              : 'text-ink-500 hover:text-ink-700'
+            }`}
+        >
+          <User className="h-4 w-4" />
+          Individual
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setAccountType('company');
+            setError(null);
+          }}
+          className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition ${accountType === 'company'
+              ? 'bg-white text-brand-700 shadow-soft'
+              : 'text-ink-500 hover:text-ink-700'
+            }`}
+        >
+          <Building2 className="h-4 w-4" />
+          Company Owner
+        </button>
       </div>
+
+      {accountType === 'candidate' ? (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-ink-700">First name</label>
+            <input
+              required
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              className="h-12 w-full rounded-xl border border-ink-200 bg-white px-4 text-sm text-ink-900 shadow-soft outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+              placeholder="Alex"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-ink-700">Last name</label>
+            <input
+              required
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              className="h-12 w-full rounded-xl border border-ink-200 bg-white px-4 text-sm text-ink-900 shadow-soft outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+              placeholder="Kim"
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-ink-700">Company name</label>
+            <div className="relative">
+              <Building2 className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+              <input
+                required
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                className="h-12 w-full rounded-xl border border-ink-200 bg-white pl-11 pr-4 text-sm text-ink-900 shadow-soft outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                placeholder="Acme Corp"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-ink-700">Owner / Contact name</label>
+            <div className="relative">
+              <User className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+              <input
+                required
+                value={ownerName}
+                onChange={(e) => setOwnerName(e.target.value)}
+                className="h-12 w-full rounded-xl border border-ink-200 bg-white pl-11 pr-4 text-sm text-ink-900 shadow-soft outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                placeholder="Sarah Chen"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-ink-700">Email</label>
+        <label className="mb-1.5 block text-sm font-medium text-ink-700">
+          {accountType === 'company' ? 'Work Email' : 'Email'}
+        </label>
         <div className="relative">
           <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
           <input
@@ -322,10 +413,11 @@ export function SignupPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="h-12 w-full rounded-xl border border-ink-200 bg-white pl-11 pr-4 text-sm text-ink-900 shadow-soft outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
-            placeholder="you@example.com"
+            placeholder={accountType === 'company' ? 'hiring@acme.com' : 'you@example.com'}
           />
         </div>
       </div>
+
       <div>
         <label className="mb-1.5 block text-sm font-medium text-ink-700">Password</label>
         <div className="relative">

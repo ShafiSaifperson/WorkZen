@@ -87,7 +87,12 @@ export async function signInWithPassword(email: string, password: string): Promi
   return user;
 }
 
-export async function signUp(email: string, password: string, fullName: string): Promise<AuthUser> {
+export async function signUp(
+  email: string,
+  password: string,
+  fullName: string,
+  role: UserRole = 'candidate'
+): Promise<AuthUser> {
   const db = await getDb();
   const existing = await db.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase().trim()]);
   if (existing.rows.length > 0) {
@@ -96,14 +101,14 @@ export async function signUp(email: string, password: string, fullName: string):
   const id = 'u' + Date.now();
   await db.query(
     'INSERT INTO users (id, email, password, full_name, role) VALUES ($1, $2, $3, $4, $5)',
-[id, email.toLowerCase().trim(), password, fullName, 'candidate']
+    [id, email.toLowerCase().trim(), password, fullName, role]
   );
   const user: AuthUser = {
-  id,
-  email: email.toLowerCase().trim(),
-  full_name: fullName,
-  role: 'candidate',
-};
+    id,
+    email: email.toLowerCase().trim(),
+    full_name: fullName,
+    role,
+  };
   localStorage.setItem('workzen-user', JSON.stringify(user));
   return user;
 }
@@ -136,11 +141,9 @@ interface AuthContextValue {
   loading: boolean;
   signInWithOAuthProfile: (profile: OAuthProfile) => Promise<AuthUser>;
   signIn: (email: string, password: string) => Promise<AuthUser>;
-  signUp: (email: string, password: string, fullName: string) => Promise<AuthUser>;
+  signUp: (email: string, password: string, fullName: string, role?: UserRole) => Promise<AuthUser>;
   signOut: () => void;
-  
 }
-
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
@@ -148,8 +151,8 @@ const AuthContext = createContext<AuthContextValue>({
   signIn: async () => { throw new Error('AuthProvider not mounted'); },
   signUp: async () => { throw new Error('AuthProvider not mounted'); },
   signInWithOAuthProfile: async () => {
-  throw new Error('AuthProvider not mounted');
-},
+    throw new Error('AuthProvider not mounted');
+  },
   signOut: () => {},
 });
 
@@ -184,8 +187,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return u;
   }
 
-  async function handleSignUp(email: string, password: string, fullName: string) {
-    const u = await signUp(email, password, fullName);
+  async function handleSignUp(email: string, password: string, fullName: string, role: UserRole = 'candidate') {
+    const u = await signUp(email, password, fullName, role);
     setUser(u);
     return u;
   }
@@ -195,25 +198,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }
 
+  async function handleOAuthProfile(profile: OAuthProfile) {
+    const u = await signInWithOAuthProfile(profile);
+    setUser(u);
+    return u;
+  }
+
   return (
     <AuthContext.Provider
-     value={{
-  user,
-  loading,
-  signIn: handleSignIn,
-  signUp: handleSignUp,
-  signInWithOAuthProfile: handleOAuthProfile,
-  signOut: handleSignOut,
-}}
+      value={{
+        user,
+        loading,
+        signIn: handleSignIn,
+        signUp: handleSignUp,
+        signInWithOAuthProfile: handleOAuthProfile,
+        signOut: handleSignOut,
+      }}
     >
       {children}
     </AuthContext.Provider>
   );
-  async function handleOAuthProfile(profile: OAuthProfile) {
-  const u = await signInWithOAuthProfile(profile);
-  setUser(u);
-  return u;
-}
 }
 
 export function useAuth() {

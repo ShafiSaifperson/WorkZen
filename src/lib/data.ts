@@ -65,6 +65,7 @@ export async function createCompanyJob(
   input: JobInput
 ): Promise<void> {
   const db = await getDb();
+  const logo = input.logo?.trim() || (input.company ? input.company.slice(0, 2).toUpperCase() : 'WZ');
 
   await db.query(
     `INSERT INTO jobs (
@@ -77,7 +78,7 @@ export async function createCompanyJob(
       `j${crypto.randomUUID()}`,
       input.title,
       input.company,
-      input.logo,
+      logo,
       input.location,
       input.description,
       input.remote,
@@ -97,6 +98,7 @@ export async function updateCompanyJob(
   input: JobInput
 ): Promise<void> {
   const db = await getDb();
+  const logo = input.logo?.trim() || (input.company ? input.company.slice(0, 2).toUpperCase() : 'WZ');
 
   const result = await db.query(
     `UPDATE jobs
@@ -108,7 +110,7 @@ export async function updateCompanyJob(
     [
       input.title,
       input.company,
-      input.logo,
+      logo,
       input.location,
       input.description,
       input.remote,
