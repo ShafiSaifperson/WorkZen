@@ -56,8 +56,7 @@ function submitSearch(event: FormEvent<HTMLFormElement>) {    event.preventDefau
   }
 
   return (
-    <div className="min-h-screen bg-ink-50">
-      {/* Sidebar */}
+<div className="min-h-screen bg-matcha-50">      {/* Sidebar */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-ink-200 bg-white lg:flex">
         <div className="px-5 py-6">
           <Logo />

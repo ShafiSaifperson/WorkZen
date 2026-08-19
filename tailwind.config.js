@@ -8,6 +8,9 @@ export default {
         display: ['Sora', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       colors: {
+        matcha: {
+  50: '#EAF2D9',
+},
         brand: {
           50: '#eef4ff',
           100: '#d9e6ff',

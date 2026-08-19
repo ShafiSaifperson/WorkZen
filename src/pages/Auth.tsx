@@ -60,8 +60,7 @@ function AuthShell({ title, subtitle, children, footer, onPrimary, primaryLabel,
       </div>
 
       {/* Right — form */}
-      <div className="flex min-h-screen items-center justify-center bg-ink-50 px-6 py-12 sm:px-12">
-        <div className="w-full max-w-sm animate-fade-in">
+<div className="flex min-h-screen items-center justify-center bg-matcha-50 px-6 py-12 sm:px-12">        <div className="w-full max-w-sm animate-fade-in">
           <div className="mb-8 lg:hidden">
             <Logo />
           </div>

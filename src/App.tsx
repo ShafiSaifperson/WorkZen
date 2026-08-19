@@ -66,7 +66,7 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div className="grid min-h-screen place-items-center bg-ink-50">
+      <div className="grid min-h-screen place-items-center bg-matcha-50">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-ink-200 border-t-brand-600" />
       </div>
     );
