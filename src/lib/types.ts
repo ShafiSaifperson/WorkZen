@@ -43,12 +43,23 @@ export interface Interview {
   inDays: number;
 }
 
+export interface ChatAction {
+  id: string;
+  type: 'modify' | 'remove' | 'add';
+  title: string;
+  originalText?: string;
+  suggestedRewrite?: string;
+  sectionTarget?: string;
+  applied?: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'ai';
   text: string;
   timestamp?: string;
   isReport?: boolean;
+  action?: ChatAction;
 }
 
 export interface AtsCategoryScore {
@@ -63,10 +74,12 @@ export interface AtsSuggestion {
   id: string;
   category: 'Impact' | 'Skills' | 'Formatting' | 'Summary' | 'Structure';
   type: 'crit' | 'warn' | 'good';
+  actionType?: 'modify' | 'remove' | 'add';
   title: string;
   originalText?: string;
   suggestedRewrite?: string;
   explanation: string;
+  sectionTarget?: string;
 }
 
 export interface AtsReport {
@@ -85,10 +98,20 @@ export interface AtsReport {
   };
 }
 
+export interface ResumeAppliedChange {
+  id: string;
+  suggestionId: string;
+  title: string;
+  originalText: string;
+  appliedText: string;
+  appliedAt: string;
+}
+
 export interface ResumeData {
   fileName: string;
   fileSize: string;
   rawText: string;
+  originalRawText?: string;
   uploadedAt: string;
 }
 export interface JobInput {

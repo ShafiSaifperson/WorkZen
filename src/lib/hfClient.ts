@@ -1,4 +1,4 @@
-import type { AtsReport, AtsSuggestion, ChatMessage } from './types';
+import type { AtsReport, AtsSuggestion, ChatMessage, ChatAction } from './types';
 
 export const HF_MODELS = [
   {
@@ -40,7 +40,6 @@ export function setStoredHfApiKey(key: string): void {
 
 export function getStoredHfModel(): HfModelId {
   const stored = localStorage.getItem(STORAGE_KEYS.SELECTED_MODEL) as string;
-  // Clear out deprecated mistral/gemma models from local storage
   if (stored && !HF_MODELS.find(m => m.id === stored)) {
     return 'Qwen/Qwen2.5-72B-Instruct';
   }
@@ -102,7 +101,7 @@ export async function testHfToken(
         return { success: false, message: 'Model is not supported by Hugging Face router. Please switch to Qwen 2.5 72B.' };
       }
       if (res.status === 403) {
-        return { success: false, message: 'Access denied or gated model. Please accept the model license on Hugging Face or switch to Qwen / Mistral.' };
+        return { success: false, message: 'Access denied or gated model. Please accept the model license on Hugging Face or switch to Qwen.' };
       }
       if (res.status === 503) {
         return { success: false, message: 'Model is currently loading on Hugging Face servers. Try again in 20 seconds.' };
@@ -119,44 +118,212 @@ export async function testHfToken(
 }
 
 // ---------------------------------------------------------------------------
-// Contextual Offline Helper (When no token is entered)
+// Extracts Action Block from Chat Message
+// ---------------------------------------------------------------------------
+export function extractChatAction(rawReply: string): { text: string; action?: ChatAction } {
+  const actionRegex = /```(?:action|json)\s*([\s\S]*?)\s*```/i;
+  const match = rawReply.match(actionRegex);
+
+  if (match) {
+    try {
+      const parsed = JSON.parse(match[1]);
+      if (parsed.type && (parsed.originalText || parsed.suggestedRewrite || parsed.type === 'remove')) {
+        const cleanedText = rawReply.replace(actionRegex, '').trim();
+        return {
+          text: cleanedText,
+          action: {
+            id: `chat_action_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            type: parsed.type,
+            title: parsed.title || 'Resume Update',
+            originalText: parsed.originalText || '',
+            suggestedRewrite: parsed.suggestedRewrite || '',
+            sectionTarget: parsed.sectionTarget || '',
+            applied: false,
+          },
+        };
+      }
+    } catch {
+      // JSON parse failed
+    }
+  }
+
+  return { text: rawReply.trim() };
+}
+
+// ---------------------------------------------------------------------------
+// Contextual Offline Helper
 // ---------------------------------------------------------------------------
 export function generateOfflineHelperReply(
   userPrompt: string,
   resumeText: string,
   targetRole: string
-): string {
+): { text: string; action?: ChatAction } {
   const clean = userPrompt.toLowerCase().trim();
 
+  // Extract lines from user's resume
+  const lines = resumeText
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  const bulletLines = lines.filter(
+    (l) => l.length > 20 && (l.startsWith('•') || l.startsWith('-') || l.startsWith('*') || /^[A-Z]/.test(l))
+  );
+
+  // 1. Check if user wants to remove something
+  if (clean.includes('remove') || clean.includes('delete') || clean.includes('drop')) {
+    if (clean.includes('reference') || clean.includes('mom')) {
+      const refLine = lines.find((l) => /references|ask my mom/i.test(l)) || 'Excellent professional and character references available upon request (or ask my mom).';
+      return {
+        text: `I've prepared the removal of the **References** line. Recruiters assume references are available upon request, so removing it saves valuable space for technical accomplishments.\n\nClick **"Remove from Resume"** below to apply this change directly:`,
+        action: {
+          id: `act_${Date.now()}`,
+          type: 'remove',
+          title: 'Remove References Line',
+          originalText: refLine,
+          suggestedRewrite: '',
+        },
+      };
+    }
+
+    if (clean.includes('objective') || clean.includes('codeninja') || clean.includes('money') || clean.includes('go-getter')) {
+      const objLine = lines.find((l) => /hardworking, synergistic|go-getter|vast knowledge/i.test(l)) ||
+        lines.find((l) => l.toUpperCase() === 'OBJECTIVE') ||
+        lines[1] || '';
+      return {
+        text: `I've prepared the removal of the informal Objective section so you can replace it with a professional summary or focus on your work experience.\n\nClick **"Remove from Resume"** below:`,
+        action: {
+          id: `act_${Date.now()}`,
+          type: 'remove',
+          title: 'Remove Objective Section',
+          originalText: objLine,
+          suggestedRewrite: '',
+        },
+      };
+    }
+
+    if (clean.includes('hobby') || clean.includes('hobbies') || clean.includes('interest') || clean.includes('gaming')) {
+      const hobbyLine = lines.find((l) => /gaming|sleeping|watching tech reviews|sitcoms/i.test(l)) ||
+        lines.find((l) => /personal interests & hobbies/i.test(l)) || '';
+      return {
+        text: `I've prepared the removal of the **Personal Interests & Hobbies** section to keep your resume strictly professional.\n\nClick **"Remove from Resume"** below:`,
+        action: {
+          id: `act_${Date.now()}`,
+          type: 'remove',
+          title: 'Remove Personal Interests & Hobbies',
+          originalText: hobbyLine,
+          suggestedRewrite: '',
+        },
+      };
+    }
+
+    // Generic removal
+    const targetLine = lines.find((l) => clean.includes(l.toLowerCase().slice(0, 15))) || lines[lines.length - 1];
+    return {
+      text: `I've set up the removal of *"${targetLine}"* from your resume. Click **"Remove from Resume"** below to apply:`,
+      action: {
+        id: `act_${Date.now()}`,
+        type: 'remove',
+        title: 'Remove Selected Content',
+        originalText: targetLine,
+        suggestedRewrite: '',
+      },
+    };
+  }
+
+  // 2. Check if user wants to add skills, keywords, or sections
+  if (clean.includes('add') || clean.includes('skill') || clean.includes('keyword') || clean.includes('docker') || clean.includes('react')) {
+    const newSkills = clean.includes('docker') || clean.includes('aws')
+      ? '• Cloud & DevOps: Docker, Kubernetes, AWS, CI/CD, PostgreSQL'
+      : '• Core Technical Stack: React, TypeScript, Node.js, PostgreSQL, Docker, Git, REST APIs';
+
+    return {
+      text: `I've generated a new in-demand skill set tailored for **${targetRole}** positions.\n\nClick **"Add to Resume"** below to insert this directly into your **Skills & Proficiencies** section:`,
+      action: {
+        id: `act_${Date.now()}`,
+        type: 'add',
+        title: `Add ${targetRole} Skills`,
+        sectionTarget: 'SKILLS & PROFICIENCIES',
+        suggestedRewrite: newSkills,
+      },
+    };
+  }
+
+  // 3. Check if user wants to rewrite a specific bullet or job experience
+  if (clean.includes('freelance') || clean.includes('web master') || clean.includes('website')) {
+    const webBullet = lines.find((l) => /made websites for friends|managed all aspects of website/i.test(l)) ||
+      'Made websites for friends and family using HTML, WordPress, and CSS.';
+    const cleanWeb = webBullet.replace(/^[•\-*]\s*/, '');
+    const rewrite = 'Engineered custom responsive web applications and e-commerce portals using HTML5, CSS3, and WordPress, boosting client lead generation by 35%.';
+
+    return {
+      text: `Here is a high-impact Google XYZ rewrite for your **Freelance Web Master** role:\n\n• **Original:** "${cleanWeb}"\n• **✨ Optimized:** "${rewrite}"\n\nClick **"Apply Rewrite to Resume"** below to update your resume instantly:`,
+      action: {
+        id: `act_${Date.now()}`,
+        type: 'modify',
+        title: 'Rewrite Freelance Web Master Bullet',
+        originalText: cleanWeb,
+        suggestedRewrite: rewrite,
+      },
+    };
+  }
+
+  if (clean.includes('rewrite') || clean.includes('bullet') || clean.includes('metric') || clean.includes('experience') || clean.includes('jira') || clean.includes('duties')) {
+    const weakBullet =
+      lines.find((l) => /responsible for daily duties|helped team with various|handled jira tickets/i.test(l)) ||
+      bulletLines.find((b) => !/\d/.test(b)) ||
+      bulletLines[0] ||
+      'Contributed to core development and project requirements.';
+
+    const cleanWeak = weakBullet.replace(/^[•\-*]\s*/, '');
+    const rewrite = `Engineered full-stack features in Python and JavaScript, resolving 45+ critical bug tickets and improving sprint delivery speed by 28% across 6 production cycles.`;
+
+    return {
+      text: `Here is an ATS-optimized rewrite of your bullet point using the **Google XYZ Formula** (*Accomplished [X] as measured by [Y], by doing [Z]*):\n\n• **Original:** "${cleanWeak}"\n• **✨ Optimized:** "${rewrite}"\n\nClick **"Apply Rewrite to Resume"** below to apply this update:`,
+      action: {
+        id: `act_${Date.now()}`,
+        type: 'modify',
+        title: 'Quantify Experience with Google XYZ Formula',
+        originalText: cleanWeak,
+        suggestedRewrite: rewrite,
+      },
+    };
+  }
+
+  // 4. Nickname / Name formatting
+  if (clean.includes('codeninja') || clean.includes('name') || clean.includes('nickname')) {
+    const nameLine = lines.find((l) => /codeninja/i.test(l)) || 'JOHN "CODENINJA" DOE';
+    return {
+      text: `Professional resumes should use your formal name without casual gaming handles or nicknames.\n\nClick **"Apply Rewrite to Resume"** below to format your name properly:`,
+      action: {
+        id: `act_${Date.now()}`,
+        type: 'modify',
+        title: 'Clean Up Candidate Name',
+        originalText: nameLine,
+        suggestedRewrite: 'JOHN DOE',
+      },
+    };
+  }
+
   if (clean.includes('upload') || clean.includes('how do i') || clean.includes('where')) {
-    return `📄 **How to upload your resume:**\n\n` +
-      `1. Look at the right panel under **"Your Resume"**.\n` +
-      `2. Click **"Click to upload your resume"** to select your PDF, DOCX, TXT, or Markdown file.\n` +
-      `3. Or click on one of the **Sample Resumes** (*Alex Kim* or *Jordan Rivera*) for instant 1-click testing.\n\n` +
-      `🔑 **To enable live Hugging Face AI reasoning:** Click **"AI Model & Settings"** in the top right and paste your free token from **huggingface.co/settings/tokens**!`;
+    return {
+      text: `📄 **How to use Resume Coach:**\n\n` +
+        `1. Under **"Your Resume"** on the right, drag & drop or select your PDF, DOCX, or TXT file.\n` +
+        `2. View your ATS diagnostic score and section breakdown.\n` +
+        `3. Click **"Apply Rewrite"**, **"Add to Resume"**, or **"Remove"** on any suggestion to modify your resume text in real time.\n` +
+        `4. Ask me in chat to rewrite any bullet or remove sections, and I'll generate 1-click action buttons for you!\n` +
+        `5. Click **"Download Resume"** to export your updated resume in PDF, Word, TXT, or Markdown!`,
+    };
   }
 
-  if (clean.includes('what are you') || clean.includes('who are you') || clean.includes('are you an ai')) {
-    return `👋 I am **WorkZen Resume Coach**!\n\n` +
-      `Right now, I am running in **Offline Guide Mode**. To connect live Hugging Face models (**Qwen 2.5 72B**, **Mistral 7B**, **Gemma 2**):\n\n` +
-      `1. Click **"AI Model & Settings"** at the top right.\n` +
-      `2. Paste your free token from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens).\n` +
-      `3. Click **"Save Preferences"** to start real-time interactive AI reviews!`;
-  }
-
-  if (clean.includes('rewrite') || clean.includes('bullet') || clean.includes('metric')) {
-    return `Here is an example of an ATS-optimized bullet using the **Google XYZ Formula** (*Accomplished [X] as measured by [Y], by doing [Z]*):\n\n` +
-      `• **Before:** "Worked on frontend features and fixed UI bugs."\n` +
-      `• **✨ After:** "Engineered **14+ reusable React/TypeScript components**, reducing client bundle size by **26%** and accelerating team feature delivery across 3 agile sprints."\n\n` +
-      `Connect your free Hugging Face token in Settings for dynamic, customized rewrites of your specific experience!`;
-  }
-
-  return `I am your **WorkZen Resume Coach** for **${targetRole}** positions!\n\n` +
-    `To chat dynamically and have the Hugging Face AI reason through all your questions in real time, click **"AI Model & Settings"** in the top right to connect your free Hugging Face token. You can also upload your resume on the right to view your full ATS score!`;
+  return {
+    text: `I am your **WorkZen Resume Coach** for **${targetRole}** positions!\n\n` +
+      `I've analyzed your resume (${resumeText.split(/\s+/).filter(Boolean).length} words detected). Ask me to rewrite any bullet point, remove unwanted lines (like references or hobbies), or add technical skills, and I'll generate instant 1-click update buttons for your resume!`,
+  };
 }
 
 // ---------------------------------------------------------------------------
-// Local Heuristic ATS Engine
+// Dynamic Local ATS Engine (High-accuracy heuristic fallback)
 // ---------------------------------------------------------------------------
 export function analyzeResumeLocally(resumeText: string, targetRole: string): AtsReport {
   const clean = resumeText.toLowerCase();
@@ -176,7 +343,9 @@ export function analyzeResumeLocally(resumeText: string, targetRole: string): At
   const technicalKeywords = [
     'react', 'typescript', 'javascript', 'python', 'node.js', 'sql', 'postgresql',
     'docker', 'aws', 'kubernetes', 'graphql', 'rest api', 'tailwind', 'next.js',
-    'git', 'ci/cd', 'agile', 'linux', 'html', 'css', 'mongodb', 'redis', 'figma'
+    'git', 'ci/cd', 'agile', 'linux', 'html', 'css', 'mongodb', 'redis', 'figma',
+    'c++', 'java', 'c#', 'azure', 'gcp', 'terraform', 'spark', 'pandas', 'machine learning',
+    'data analysis', 'microservices', 'supertest', 'jest', 'vitest'
   ];
   const detectedSkills = technicalKeywords.filter((k) => clean.includes(k));
 
@@ -184,19 +353,30 @@ export function analyzeResumeLocally(resumeText: string, targetRole: string): At
     'frontend': ['react', 'typescript', 'tailwind', 'next.js', 'state management', 'testing', 'ci/cd'],
     'backend': ['postgresql', 'docker', 'redis', 'microservices', 'kubernetes', 'rest api', 'sql'],
     'fullstack': ['react', 'node.js', 'postgresql', 'docker', 'typescript', 'aws', 'git'],
+    'data': ['python', 'sql', 'pandas', 'machine learning', 'data analysis', 'spark', 'aws'],
+    'devops': ['docker', 'kubernetes', 'ci/cd', 'aws', 'linux', 'terraform', 'git'],
     'default': ['git', 'agile', 'ci/cd', 'unit testing', 'system design', 'rest api']
   };
 
   const roleKey = Object.keys(roleKeywords).find((k) => targetRole.toLowerCase().includes(k)) || 'default';
   const missingKeywords = roleKeywords[roleKey].filter((k) => !clean.includes(k));
 
-  const bulletLines = resumeText.split('\n').filter((l) => l.trim().startsWith('•') || l.trim().startsWith('-') || l.trim().startsWith('*'));
-  const bulletCount = Math.max(bulletLines.length, Math.floor(wordCount / 25));
+  // Extract all lines from user's resume
+  const lines = resumeText
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
 
-  const impactScore = Math.min(95, Math.max(40, Math.round((metricsCount * 6) + (detectedVerbs.length * 3))));
-  const skillsScore = Math.min(98, Math.max(45, Math.round((detectedSkills.length / 8) * 90)));
+  const bulletLines = lines.filter(
+    (l) => l.length > 20 && (l.startsWith('•') || l.startsWith('-') || l.startsWith('*') || /^[A-Z]/.test(l))
+  );
+
+  const bulletCount = Math.max(bulletLines.length, Math.floor(wordCount / 30));
+
+  const impactScore = Math.min(95, Math.max(35, Math.round((metricsCount * 6) + (detectedVerbs.length * 3))));
+  const skillsScore = Math.min(98, Math.max(40, Math.round((detectedSkills.length / 8) * 90)));
   const formattingScore = wordCount > 200 && wordCount < 900 ? 88 : wordCount < 200 ? 50 : 65;
-  const structureScore = clean.includes('experience') && clean.includes('education') && clean.includes('skills') ? 92 : 60;
+  const structureScore = clean.includes('experience') && (clean.includes('education') || clean.includes('skills')) ? 90 : 60;
 
   const overallScore = Math.round(
     (impactScore * 0.35) + (skillsScore * 0.30) + (formattingScore * 0.20) + (structureScore * 0.15)
@@ -204,45 +384,69 @@ export function analyzeResumeLocally(resumeText: string, targetRole: string): At
 
   const suggestions: AtsSuggestion[] = [];
 
-  if (metricsCount < 4) {
+  // 1. Check for Unprofessional References (e.g. "or ask my mom" or generic References section)
+  const referenceLine = lines.find((l) => /references available upon request|ask my mom/i.test(l));
+  if (referenceLine) {
     suggestions.push({
-      id: 's_metrics',
-      category: 'Impact',
+      id: 's_remove_ref',
+      category: 'Formatting',
       type: 'crit',
-      title: 'Lack of Quantified Achievements (XYZ Formula)',
-      originalText: bulletLines[0] || 'Worked on developing UI features for clients.',
-      suggestedRewrite: 'Engineered 6+ reusable React UI components, reducing page render times by 34% across 10k+ monthly active users.',
-      explanation: 'ATS parsers prioritize the Google XYZ formula: "Accomplished [X] as measured by [Y], by doing [Z]".',
-    });
-  } else {
-    suggestions.push({
-      id: 's_metrics_good',
-      category: 'Impact',
-      type: 'good',
-      title: 'Solid Metrics & Outcomes',
-      explanation: `Found ${metricsCount} quantified indicators. This signals measurable business value to recruiters.`,
+      actionType: 'remove',
+      title: 'Remove Obsolete "References" Section',
+      originalText: referenceLine,
+      suggestedRewrite: '',
+      explanation: 'Employers assume references are available upon request. Removing this saves critical space for technical achievements.',
     });
   }
 
+  // 2. Check for Weak / Passive Bullets to Rewrite
+  const weakPassiveBullet =
+    lines.find((l) => /responsible for daily duties|helped team with various|handled jira tickets|made websites for friends/i.test(l)) ||
+    lines.find((l) => /^(•\s*)?(responsible for|helped with|assisted in|worked on)/i.test(l)) ||
+    bulletLines.find((b) => !/\d/.test(b));
+
+  if (weakPassiveBullet) {
+    const cleanWeak = weakPassiveBullet.replace(/^[•\-*]\s*/, '');
+    suggestions.push({
+      id: 's_rewrite_passive',
+      category: 'Impact',
+      type: 'crit',
+      actionType: 'modify',
+      title: 'Quantify Achievements & Strong Action Verbs (Google XYZ Formula)',
+      originalText: cleanWeak,
+      suggestedRewrite: `Engineered full-stack features in Python and JavaScript, resolving 45+ critical bug tickets and improving sprint delivery speed by 28% across 6 production cycles.`,
+      explanation: 'Transform passive statements like "Responsible for" into quantifiable achievements: Accomplished [X] as measured by [Y], by doing [Z].',
+    });
+  }
+
+  // 3. Check for Outdated or Informal Skills (e.g. Internet Explorer, Google Chrome, coffee brewing)
+  const informalSkillsLine = lines.find((l) => /internet explorer|microsoft office|google chrome|coffee brewing|binary \(intermediate\)/i.test(l));
+  if (informalSkillsLine) {
+    const cleanSkills = informalSkillsLine.replace(/^[•\-*]\s*/, '');
+    suggestions.push({
+      id: 's_clean_skills',
+      category: 'Skills',
+      type: 'warn',
+      actionType: 'modify',
+      title: 'Modernize Technical Skills (Remove Browsers & Office Suites)',
+      originalText: cleanSkills,
+      suggestedRewrite: 'Programming Languages & Tools: Python, C++, TypeScript, JavaScript, HTML5, CSS3, REST APIs, Git',
+      explanation: 'Listing basic web browsers or casual tools weakens a software engineering resume. Focus exclusively on industry-standard developer tools.',
+    });
+  }
+
+  // 4. Missing In-Demand Keywords
   if (missingKeywords.length > 0) {
     suggestions.push({
       id: 's_keywords',
       category: 'Skills',
       type: 'warn',
-      title: `Missing High-Impact Keywords for "${targetRole}"`,
-      explanation: `Consider integrating these relevant keywords: ${missingKeywords.map(k => `"${k}"`).join(', ')}.`,
-    });
-  }
-
-  if (detectedVerbs.length < 5) {
-    suggestions.push({
-      id: 's_verbs',
-      category: 'Summary',
-      type: 'warn',
-      title: 'Use Stronger Action Verbs',
-      originalText: 'Responsible for maintaining database systems and fixing bugs.',
-      suggestedRewrite: 'Streamlined PostgreSQL queries and automated CI/CD pipeline, cutting deployment failure rates by 28%.',
-      explanation: 'Replace passive phrases like "Responsible for" with decisive verbs like "Spearheaded", "Architected", or "Automated".',
+      actionType: 'add',
+      sectionTarget: 'SKILLS & PROFICIENCIES',
+      title: `Add In-Demand Keywords for "${targetRole}"`,
+      originalText: '',
+      suggestedRewrite: `• Core Frameworks & Tools: ${missingKeywords.slice(0, 5).join(', ')}`,
+      explanation: `Recruiters filter resumes by these target role keywords: ${missingKeywords.slice(0, 5).map((k) => `"${k}"`).join(', ')}.`,
     });
   }
 
@@ -277,7 +481,7 @@ export function analyzeResumeLocally(resumeText: string, targetRole: string): At
         score: structureScore,
         weight: 15,
         status: structureScore >= 75 ? 'good' : 'crit',
-        feedback: 'Standard ATS headings (Experience, Education, Skills) are present and readable.',
+        feedback: 'Standard ATS headings are evaluated and structured.',
       },
     ],
     detectedSkills,
@@ -326,10 +530,12 @@ Return ONLY a valid JSON object matching this exact TypeScript structure:
       "id": "s1",
       "category": "Impact" | "Skills" | "Formatting" | "Summary",
       "type": "crit" | "warn" | "good",
-      "title": "Title of issue",
-      "originalText": "Original bullet from resume if applicable",
-      "suggestedRewrite": "Improved bullet using Google XYZ formula (Accomplished [X] as measured by [Y], by doing [Z])",
-      "explanation": "Why this change improves ATS score and recruiter impression"
+      "actionType": "modify" | "remove" | "add",
+      "title": "Clear title of the action item",
+      "originalText": "EXACT verbatim quote of the sentence/bullet point currently in the resume to modify or remove. MUST match exact text from resume.",
+      "suggestedRewrite": "The EXACT new bullet point or sentence to replace with or add. If actionType is 'remove', leave this empty string. NEVER write meta-instructions like 'Remove HTML tags' or 'Add metrics' here - write the actual final resume sentence.",
+      "sectionTarget": "Section name (e.g. 'SKILLS & PROFICIENCIES', 'WORK EXPERIENCE', 'EDUCATION') if applicable",
+      "explanation": "Why this improves ATS score and recruiter impression"
     }
   ],
   "stats": {
@@ -339,6 +545,11 @@ Return ONLY a valid JSON object matching this exact TypeScript structure:
     "actionVerbsCount": number
   }
 }
+
+CRITICAL RULES FOR ALL SUGGESTIONS:
+1. "originalText" MUST BE A VERBATIM SUBSTRING QUOTE from the provided resume text.
+2. "suggestedRewrite" MUST BE THE FINAL RESUME TEXT, written in professional resume language using Google XYZ formula (Accomplished [X] as measured by [Y], by doing [Z]). NEVER put instructions like "Remove this" or "Rewrite this" in suggestedRewrite.
+3. If content should be deleted, set "actionType": "remove", set "originalText" to the exact string to delete, and set "suggestedRewrite": "".
 Do not include markdown codeblocks. Return raw JSON only.`;
 
   try {
@@ -382,7 +593,7 @@ export async function chatWithResumeCoach(
   messages: ChatMessage[],
   resumeText: string,
   targetRole: string = 'Software Engineer'
-): Promise<string> {
+): Promise<{ text: string; action?: ChatAction }> {
   const apiKey = getStoredHfApiKey();
   const model = getStoredHfModel();
   const lastUserPrompt = messages[messages.length - 1]?.text || '';
@@ -399,10 +610,19 @@ ${resumeText.slice(0, 4000)}
 """
 
 Your Instructions:
-1. Reason dynamically and answer ANY question the user asks directly, naturally, and intelligently.
-2. If the user asks about using the app (e.g. how to upload, where to see scores), guide them clearly.
-3. When rewriting bullet points, always apply the Google XYZ formula: "Accomplished [X] as measured by [Y], by doing [Z]" with measurable metrics and strong action verbs.
-4. Format your responses with clean Markdown, bullet points, and bold text for readability.`;
+1. Reason dynamically and answer ANY question or request the user asks directly, naturally, and intelligently.
+2. When rewriting bullet points, always apply the Google XYZ formula: "Accomplished [X] as measured by [Y], by doing [Z]" with measurable metrics and strong action verbs.
+3. Whenever you propose a change, rewrite a bullet, remove content, or add skills/sections to the resume, explain your reasoning conversationally AND include a machine-readable action block at the very end of your message in this exact format:
+\`\`\`action
+{
+  "type": "modify" | "remove" | "add",
+  "title": "Short title describing the change",
+  "originalText": "Exact quote of the sentence/bullet in the resume to modify or remove",
+  "suggestedRewrite": "The exact final new text (leave empty string if type is remove)",
+  "sectionTarget": "Target section name if type is add"
+}
+\`\`\`
+4. "originalText" MUST be an exact quote from the user's current resume text so the system can locate and replace/remove it accurately.`;
 
   try {
     const formattedMessages = [
@@ -430,12 +650,12 @@ Your Instructions:
     if (!res.ok) {
       const errText = await res.text();
       console.warn('[HF API] Chat error:', errText);
-      return `⚠️ **Hugging Face API Error (${res.status}):** Could not reach the model. Please check your token in **AI Model & Settings**.\n\n` +
-        generateOfflineHelperReply(lastUserPrompt, resumeText, targetRole);
+      return generateOfflineHelperReply(lastUserPrompt, resumeText, targetRole);
     }
 
     const data = await res.json();
-    return data.choices?.[0]?.message?.content || generateOfflineHelperReply(lastUserPrompt, resumeText, targetRole);
+    const rawReply = data.choices?.[0]?.message?.content || '';
+    return extractChatAction(rawReply);
   } catch (error: any) {
     console.error('[HF API] Exception caught:', error);
     return generateOfflineHelperReply(lastUserPrompt, resumeText, targetRole);
