@@ -1,4 +1,9 @@
-import { useState, type FormEvent } from 'react';
+import {
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';import {
   LayoutDashboard,
   Briefcase,
@@ -43,6 +48,13 @@ export function AppShell({ user, onSignOut }: AppShellProps) {
   const initials = getInitials(fullName, email);
     const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+
+const [profileImage, setProfileImage] = useState<string | null>(() => {
+  return localStorage.getItem(`workzen-profile-image-${user.id}`);
+});
+
+const profileImageInputRef = useRef<HTMLInputElement>(null);
   const nav = user.role === 'company' ? companyNav : candidateNav;
 
 function submitSearch(event: FormEvent<HTMLFormElement>) {    event.preventDefault();
@@ -54,6 +66,41 @@ function submitSearch(event: FormEvent<HTMLFormElement>) {    event.preventDefau
         : '/app/jobs'
     );
   }
+
+  function handleProfileImageChange(event: ChangeEvent<HTMLInputElement>) {
+  const selectedFile = event.target.files?.[0];
+
+  if (!selectedFile) return;
+
+  if (!selectedFile.type.startsWith('image/')) {
+    window.alert('Please choose an image file.');
+    return;
+  }
+
+  if (selectedFile.size > 2 * 1024 * 1024) {
+    window.alert('Please choose an image smaller than 2 MB.');
+    return;
+  }
+
+  const reader = new FileReader();
+
+  reader.onload = () => {
+    const imageData = String(reader.result);
+
+    try {
+      localStorage.setItem(`workzen-profile-image-${user.id}`, imageData);
+      setProfileImage(imageData);
+      setProfileMenuOpen(false);
+    } catch {
+      window.alert('The image could not be saved. Please choose a smaller image.');
+    }
+  };
+
+  reader.readAsDataURL(selectedFile);
+
+  // Lets the user select the same image again later if wanted.
+  event.target.value = '';
+}
 
   return (
 <div className="min-h-screen bg-matcha-50">      {/* Sidebar */}
@@ -148,18 +195,64 @@ function submitSearch(event: FormEvent<HTMLFormElement>) {    event.preventDefau
               <Bell className="h-5 w-5" />
               <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-accent-500 ring-2 ring-white" />
             </button>
-            <div className="flex items-center gap-2.5 rounded-xl py-1.5 pl-1.5 pr-3 transition hover:bg-ink-100">
-              <div className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-xs font-bold text-white">
-                {initials}
-              </div>
-              <div className="text-left">
-                <p className="text-sm font-semibold leading-tight text-ink-900">
-                  {fullName || 'User'}
-                </p>
-                <p className="text-xs leading-tight text-ink-400">{email}</p>
-              </div>
-              <ChevronDown className="h-4 w-4 text-ink-400" />
-            </div>
+           <div className="relative">
+  <input
+    ref={profileImageInputRef}
+    type="file"
+    accept="image/*"
+    className="hidden"
+    onChange={handleProfileImageChange}
+  />
+
+  <button
+    type="button"
+    onClick={() => setProfileMenuOpen((isOpen) => !isOpen)}
+    aria-expanded={profileMenuOpen}
+    aria-haspopup="menu"
+    className="flex items-center gap-2.5 rounded-xl py-1.5 pl-1.5 pr-3 transition hover:bg-ink-100"
+  >
+    {profileImage ? (
+      <img
+        src={profileImage}
+        alt={`${fullName || 'User'} profile`}
+        className="h-8 w-8 rounded-full object-cover"
+      />
+    ) : (
+      <div className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-xs font-bold text-white">
+        {initials}
+      </div>
+    )}
+
+    <div className="text-left">
+      <p className="text-sm font-semibold leading-tight text-ink-900">
+        {fullName || 'User'}
+      </p>
+      <p className="text-xs leading-tight text-ink-400">{email}</p>
+    </div>
+
+    <ChevronDown
+      className={`h-4 w-4 text-ink-400 transition-transform ${
+        profileMenuOpen ? 'rotate-180' : ''
+      }`}
+    />
+  </button>
+
+  {profileMenuOpen && (
+    <div
+      role="menu"
+      className="absolute right-0 top-full z-50 mt-2 w-52 rounded-xl border border-ink-200 bg-white p-1.5 shadow-card"
+    >
+      <button
+        type="button"
+        role="menuitem"
+        onClick={() => profileImageInputRef.current?.click()}
+        className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-ink-700 transition hover:bg-ink-100 hover:text-ink-900"
+      >
+        Add profile image
+      </button>
+    </div>
+  )}
+</div>
           </div>
         </header>
         <main className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
