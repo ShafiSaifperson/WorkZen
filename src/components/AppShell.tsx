@@ -14,7 +14,8 @@ import {
   Search,
   Bell,
   ChevronDown,
-  Building2,
+    Building2,
+  Award,
 } from 'lucide-react';
 import type { AuthUser } from '@/lib/auth';
 import { useNotifications } from '@/lib/notifications';
@@ -288,6 +289,17 @@ export function AppShell({ user, onSignOut }: AppShellProps) {
         >
           <FileText className="h-4 w-4" />
           Your Resume
+        </Link>
+      )}
+            {user.role === 'candidate' && (
+        <Link
+          to="/app/certifications"
+          role="menuitem"
+          onClick={() => setProfileMenuOpen(false)}
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-ink-700 transition hover:bg-ink-100 hover:text-ink-900"
+        >
+          <Award className="h-4 w-4" />
+          Add Certifications
         </Link>
       )}
     </div>
