@@ -44,7 +44,7 @@ function ApplicationCard({ app }: { app: Application }) {
   const cfg = statusConfig[app.status];
   return (
     <Link
-      to={`/app/jobs/${app.job.id}`}
+      to={`/app/applications/${app.id}`}
       className="group flex items-center gap-4 rounded-xl border border-ink-100 bg-white p-4 transition hover:border-ink-200 hover:shadow-soft"
     >
       <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-ink-900 text-xs font-bold text-white">

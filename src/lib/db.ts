@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS applications (
   status TEXT NOT NULL DEFAULT 'pending',
   applied_days_ago INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE (user_id, job_id)
 );
 
@@ -83,6 +84,7 @@ CREATE TABLE IF NOT EXISTS notifications (
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'candidate';
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS company_id TEXT REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
 CREATE INDEX IF NOT EXISTS idx_applications_user_id ON applications(user_id);
 CREATE INDEX IF NOT EXISTS idx_interviews_user_id ON interviews(user_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_company_id ON jobs(company_id);

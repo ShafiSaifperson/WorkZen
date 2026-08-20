@@ -289,7 +289,7 @@ export function DashboardPage() {
               return (
                 <Link
                   key={a.id}
-                  to={`/app/jobs/${a.job.id}`}
+                  to={`/app/applications/${a.id}`}
                   className="flex items-center gap-4 rounded-xl border border-ink-100 p-3 transition hover:border-ink-200 hover:bg-ink-50"
                 >
                   <div className="grid h-10 w-10 place-items-center rounded-lg bg-ink-900 text-xs font-bold text-white">

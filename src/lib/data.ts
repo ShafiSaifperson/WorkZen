@@ -8,6 +8,7 @@ import type {
   CompanyApplication,
   NotificationItem,
   NotificationType,
+  ApplicationDetail,
 } from './types';
 
 function notifyChange() {
@@ -44,6 +45,105 @@ export async function fetchApplications(userId: string): Promise<Application[]> 
     appliedDaysAgo: row.applied_days_ago,
   }));
 }
+
+export async function fetchApplicationById(
+  userId: string,
+  applicationId: string
+): Promise<ApplicationDetail | null> {
+  const db = await getDb();
+  const result = await db.query(
+    `SELECT 
+       a.id AS app_id,
+       a.user_id AS app_user_id,
+       a.job_id AS app_job_id,
+       a.status AS app_status,
+       a.applied_days_ago,
+       a.created_at AS app_created_at,
+       a.updated_at AS app_updated_at,
+       u.full_name AS candidate_name,
+       u.email AS candidate_email,
+       j.id AS job_id,
+       j.title AS job_title,
+       j.company AS job_company,
+       j.logo AS job_logo,
+       j.location AS job_location,
+       j.description AS job_description,
+       j.remote AS job_remote,
+       j.type AS job_type,
+       j.salary_min AS job_salary_min,
+       j.salary_max AS job_salary_max,
+       j.tags AS job_tags,
+       j.posted_days_ago AS job_posted_days_ago,
+       j.company_id AS job_company_id,
+       i.id AS interview_id,
+       i.date AS interview_date,
+       i.time AS interview_time,
+       i.format AS interview_format,
+       i.with_name AS interview_with_name,
+       i.with_role AS interview_with_role,
+       i.in_days AS interview_in_days
+     FROM applications a
+     JOIN jobs j ON a.job_id = j.id
+     JOIN users u ON a.user_id = u.id
+     LEFT JOIN interviews i ON i.user_id = a.user_id AND i.job_id = a.job_id
+     WHERE a.id = $1 AND (a.user_id = $2 OR j.company_id = $2)`,
+    [applicationId, userId]
+  );
+
+  if (result.rows.length === 0) return null;
+
+  const row = result.rows[0] as any;
+
+  const job: Job = {
+    id: row.job_id,
+    title: row.job_title,
+    company: row.job_company,
+    logo: row.job_logo,
+    location: row.job_location,
+    remote: Boolean(row.job_remote),
+    type: row.job_type as Job['type'],
+    salaryMin: row.job_salary_min,
+    salaryMax: row.job_salary_max,
+    postedDaysAgo: row.job_posted_days_ago,
+    tags: row.job_tags ?? [],
+    description: row.job_description,
+    companyId: row.job_company_id,
+  };
+
+  const interview: Interview | null = row.interview_id
+    ? {
+        id: row.interview_id,
+        jobId: row.job_id,
+        jobTitle: row.job_title,
+        company: row.job_company,
+        date: row.interview_date,
+        time: row.interview_time,
+        format: row.interview_format,
+        withName: row.interview_with_name,
+        withRole: row.interview_with_role,
+        inDays: row.interview_in_days,
+      }
+    : null;
+
+  return {
+    id: row.app_id,
+    userId: row.app_user_id,
+    jobId: row.app_job_id,
+    status: row.app_status as AppStatus,
+    appliedDaysAgo: row.applied_days_ago,
+    createdAt: row.app_created_at
+      ? new Date(row.app_created_at).toISOString()
+      : new Date().toISOString(),
+    updatedAt: row.app_updated_at
+      ? new Date(row.app_updated_at).toISOString()
+      : undefined,
+    candidateName: row.candidate_name,
+    candidateEmail: row.candidate_email,
+    job,
+    interview,
+  };
+}
+
 
 export async function fetchAppliedJobIds(userId: string): Promise<string[]> {
   const db = await getDb();
@@ -231,7 +331,7 @@ export async function updateCompanyApplicationStatus(
   const appRow = ownedApplication.rows[0] as any;
 
   await db.query(
-    'UPDATE applications SET status = $1 WHERE id = $2',
+    'UPDATE applications SET status = $1, updated_at = now() WHERE id = $2',
     [status, applicationId]
   );
 

@@ -123,7 +123,7 @@ export function NotificationsPage() {
     if (item.relatedInterviewId) {
       navigate(`/app/interviews/${item.relatedInterviewId}`);
     } else if (item.relatedApplicationId) {
-      navigate('/app/applications');
+      navigate(`/app/applications/${item.relatedApplicationId}`);
     }
   }
 
@@ -311,7 +311,7 @@ export function NotificationsPage() {
                       <span className="inline-flex items-center gap-1 font-semibold text-brand-600 transition group-hover:translate-x-0.5">
                         {item.relatedInterviewId
                           ? 'View interview details'
-                          : 'View applications'}
+                          : 'View application details'}
                         <ArrowRight className="h-3 w-3" />
                       </span>
                     )}

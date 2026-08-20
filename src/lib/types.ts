@@ -155,3 +155,18 @@ export interface NotificationItem {
   createdAt: string;
 }
 
+export interface ApplicationDetail {
+  id: string;
+  userId: string;
+  jobId: string;
+  status: AppStatus;
+  appliedDaysAgo: number;
+  createdAt: string;
+  updatedAt?: string;
+  candidateName: string;
+  candidateEmail: string;
+  job: Job;
+  interview?: Interview | null;
+}
+
+

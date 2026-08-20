@@ -5,6 +5,7 @@ import { DashboardPage } from '@/pages/Dashboard';
 import { JobsPage } from '@/pages/Jobs';
 import { JobDetailPage } from '@/pages/JobDetail';
 import { ApplicationsPage } from '@/pages/Applications';
+import { ApplicationDetailPage } from '@/pages/ApplicationDetail';
 import { ResumeCoachPage } from '@/pages/ResumeCoach';
 import { CoverLetterPage } from '@/pages/CoverLetter';
 import { InterviewDetailPage } from '@/pages/InterviewDetail';
@@ -25,6 +26,7 @@ function CandidateRoutes() {
           <Route path="jobs" element={<JobsPage />} />
           <Route path="jobs/:jobId" element={<JobDetailPage />} />
           <Route path="applications" element={<ApplicationsPage />} />
+          <Route path="applications/:applicationId" element={<ApplicationDetailPage />} />
           <Route path="interviews/:interviewId" element={<InterviewDetailPage />} />
           <Route path="resume-coach" element={<ResumeCoachPage />} />
           <Route path="cover-letter" element={<CoverLetterPage />} />
