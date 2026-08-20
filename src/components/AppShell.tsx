@@ -277,7 +277,19 @@ export function AppShell({ user, onSignOut }: AppShellProps) {
         className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-ink-700 transition hover:bg-ink-100 hover:text-ink-900"
       >
         Add profile image
-      </button>
+            </button>
+
+      {user.role === 'candidate' && (
+        <Link
+          to="/app/your-resume"
+          role="menuitem"
+          onClick={() => setProfileMenuOpen(false)}
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-ink-700 transition hover:bg-ink-100 hover:text-ink-900"
+        >
+          <FileText className="h-4 w-4" />
+          Your Resume
+        </Link>
+      )}
     </div>
   )}
 </div>

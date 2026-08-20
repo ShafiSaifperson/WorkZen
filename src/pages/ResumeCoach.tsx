@@ -55,7 +55,7 @@ import { ResumeReportCard, PriorityActionItems } from '@/components/ResumeReport
 import { HfSettingsModal } from '@/components/HfSettingsModal';
 import { useAuth } from '@/lib/auth';
 import { applyToJob, fetchAppliedJobIds, fetchJobById } from '@/lib/data';
-
+import { getSavedResume } from '@/lib/savedResume';
 const QUICK_PROMPTS = [
   '✨ Rewrite my weakest bullet with metrics',
   '🎯 Check missing keywords for my target role',
@@ -146,6 +146,22 @@ export function ResumeCoachPage() {
         setApplicationMessage('The selected job could not be loaded.');
       })
       .finally(() => setSelectedJobLoading(false));
+  }, [searchParams, user]);
+    useEffect(() => {
+    if (!user || searchParams.get('loadSavedResume') !== 'true') return;
+
+    const savedResume = getSavedResume(user.id);
+
+    if (!savedResume) {
+      window.alert('You have not saved a resume yet. Please upload one first.');
+      return;
+    }
+
+    processResume(
+      savedResume.rawText,
+      savedResume.fileName,
+      savedResume.fileSize
+    );
   }, [searchParams, user]);
 
   async function applyForSelectedJob() {

@@ -8,6 +8,7 @@ import { ApplicationsPage } from '@/pages/Applications';
 import { ApplicationDetailPage } from '@/pages/ApplicationDetail';
 import { ResumeCoachPage } from '@/pages/ResumeCoach';
 import { CoverLetterPage } from '@/pages/CoverLetter';
+import { YourResumePage } from '@/pages/YourResume';
 import { InterviewDetailPage } from '@/pages/InterviewDetail';
 import { NotificationsPage } from '@/pages/Notifications';
 import { CompanyDashboardPage } from '@/pages/CompanyDashboard';
@@ -31,6 +32,7 @@ function CandidateRoutes() {
           <Route path="interviews/:interviewId" element={<InterviewDetailPage />} />
           <Route path="resume-coach" element={<ResumeCoachPage />} />
           <Route path="cover-letter" element={<CoverLetterPage />} />
+          <Route path="your-resume" element={<YourResumePage />} />
           <Route path="notifications" element={<NotificationsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
