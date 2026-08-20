@@ -30,17 +30,53 @@ export interface Application {
   appliedDaysAgo: number;
 }
 
+export type InterviewType =
+  | 'In Office'
+  | 'Zoom'
+  | 'Google Meet'
+  | 'Phone Call'
+  | 'Other';
+
 export interface Interview {
   id: string;
+  applicationId?: string | null;
+  candidateId?: string;
+  userId?: string;
+  companyId?: string | null;
   jobId: string;
   jobTitle: string;
   company: string;
   date: string;
   time: string;
-  format: 'Video call' | 'On-site' | 'Phone screen';
+  startTime?: string;
+  endTime?: string;
+  duration?: string;
+  type?: InterviewType | string;
+  format: 'Video call' | 'On-site' | 'Phone screen' | string;
+  meetingLink?: string;
+  location?: string;
   withName: string;
   withRole: string;
+  interviewerName?: string;
+  interviewerRole?: string;
+  notes?: string;
+  status?: 'scheduled' | 'rescheduled' | 'completed' | 'cancelled';
   inDays: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface InterviewInput {
+  date: string;
+  startTime: string;
+  endTime?: string;
+  duration?: string;
+  type: InterviewType;
+  meetingLink?: string;
+  location?: string;
+  interviewerName: string;
+  interviewerRole?: string;
+  notes?: string;
 }
 
 export interface ChatAction {
@@ -129,11 +165,14 @@ export interface JobInput {
 
 export interface CompanyApplication {
   id: string;
+  userId?: string;
   status: AppStatus;
   appliedDaysAgo: number;
   candidateName: string;
   candidateEmail: string;
   job: Job;
+  interview?: Interview | null;
+  createdAt?: string;
 }
 
 export type NotificationType =

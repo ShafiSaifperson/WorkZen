@@ -87,6 +87,33 @@ function Legend({ color, label, value }: { color: string; label: string; value: 
   );
 }
 
+function MetricCard({
+  label,
+  value,
+  sub,
+  icon: Icon,
+  tint,
+}: {
+  label: string;
+  value: number | string;
+  sub: string;
+  icon: typeof Briefcase;
+  tint: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold uppercase tracking-wider text-ink-400">{label}</span>
+        <div className={`grid h-8 w-8 place-items-center rounded-lg ${tint}`}>
+          <Icon className="h-4 w-4" />
+        </div>
+      </div>
+      <p className="mt-3 font-display text-2xl font-bold text-ink-900">{value}</p>
+      <p className="mt-0.5 text-xs text-ink-400">{sub}</p>
+    </div>
+  );
+}
+
 const quickAccess = [
   { to: '/app/jobs', label: 'Find Jobs', desc: 'Search & apply', icon: Briefcase, tint: 'from-brand-500 to-brand-700' },
   { to: '/app/resume-coach', label: 'Resume Coach', desc: 'AI feedback', icon: FileText, tint: 'from-accent-500 to-accent-700' },
@@ -100,9 +127,14 @@ const statusMap = {
 } as const;
 
 const formatIcons: Record<string, typeof Video> = {
+  'Google Meet': Video,
+  'Zoom': Video,
   'Video call': Video,
+  'In Office': MapPin,
   'On-site': MapPin,
+  'Phone Call': Phone,
   'Phone screen': Phone,
+  'Other': Video,
 };
 
 export function DashboardPage() {
@@ -125,142 +157,145 @@ export function DashboardPage() {
       .finally(() => setLoading(false));
   }, [user]);
 
-  const pendingCount = useMemo(() => apps.filter((a) => a.status === 'pending').length, [apps]);
-  const firstName = useMemo(() => {
-    const full = user?.full_name || '';
-    return full.split(' ')[0] || 'there';
-  }, [user]);
-
-  const greeting = useMemo(() => {
-    const h = new Date().getHours();
-    if (h < 12) return 'Good morning';
-    if (h < 18) return 'Good afternoon';
-    return 'Good evening';
-  }, []);
+  const totalApps = apps.length;
+  const activeInterviews = interviews.length;
+  const acceptedApps = useMemo(() => apps.filter((a) => a.status === 'accepted').length, [apps]);
+  const responseRate = useMemo(
+    () => (totalApps > 0 ? Math.round(((acceptedApps + apps.filter((a) => a.status === 'rejected').length) / totalApps) * 100) : 0),
+    [totalApps, acceptedApps, apps]
+  );
 
   return (
-    <div className="mx-auto max-w-6xl animate-fade-in space-y-6">
-      {/* Greeting */}
-      <div>
-        <h1 className="font-display text-2xl font-bold text-ink-900 sm:text-3xl">
-          {greeting}, {firstName}
-        </h1>
-        <p className="mt-1 text-sm text-ink-500">
-          You have {pendingCount} application{pendingCount === 1 ? '' : 's'} awaiting a response.
-        </p>
+    <div className="mx-auto max-w-5xl animate-fade-in space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="font-display text-2xl font-bold text-ink-900 sm:text-3xl">
+            Welcome back, {user?.full_name.split(' ')[0] || 'there'} 👋
+          </h1>
+          <p className="mt-1 text-sm text-ink-500">
+            Here's what's happening with your job search today.
+          </p>
+        </div>
+        <Link
+          to="/app/jobs"
+          className="inline-flex items-center gap-2 self-start rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700 sm:self-auto"
+        >
+          <Briefcase className="h-4 w-4" /> Browse open jobs
+        </Link>
       </div>
 
-      {/* Stats + Quick access */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Application overview — now links to applications page */}
-        <Link
-          to="/app/applications"
-          className="group rounded-2xl border border-ink-200 bg-white p-6 shadow-card transition hover:border-brand-300 hover:shadow-glow lg:col-span-2"
-        >
-          <div className="mb-5 flex items-center justify-between">
-            <div>
-              <h2 className="font-display text-lg font-bold text-ink-900">Application overview</h2>
-              <p className="text-xs text-ink-400">All-time breakdown · click to view details</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-accent-500" />
-              <ArrowRight className="h-4 w-4 text-ink-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
-            </div>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {loading ? (
+          <div className="col-span-full grid place-items-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-brand-600" />
           </div>
+        ) : (
+          <>
+            <MetricCard label="Total Applications" value={totalApps} sub="All time" icon={Briefcase} tint="text-brand-600 bg-brand-50" />
+            <MetricCard label="Upcoming Interviews" value={activeInterviews} sub={activeInterviews > 0 ? `Next in ${interviews[0]?.inDays}d` : 'None scheduled'} icon={Calendar} tint="text-accent-600 bg-accent-50" />
+            <MetricCard label="Offers / Accepted" value={acceptedApps} sub="Keep it up!" icon={CheckCircle2} tint="text-emerald-600 bg-emerald-50" />
+            <MetricCard label="Response Rate" value={`${responseRate}%`} sub="Across all apps" icon={TrendingUp} tint="text-indigo-600 bg-indigo-50" />
+          </>
+        )}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card lg:col-span-2">
+          <h2 className="mb-4 font-display text-lg font-bold text-ink-900">Application funnel</h2>
           {loading ? (
-            <div className="grid place-items-center py-12">
+            <div className="grid h-48 place-items-center">
               <Loader2 className="h-6 w-6 animate-spin text-brand-600" />
             </div>
           ) : (
             <StatusWheel apps={apps} />
           )}
-        </Link>
+        </div>
 
-        <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
-          <h2 className="mb-4 font-display text-lg font-bold text-ink-900">Quick access</h2>
-          <div className="space-y-2.5">
-            {quickAccess.map((q) => (
-              <Link
-                key={q.to}
-                to={q.to}
-                className="group flex items-center gap-3 rounded-xl border border-ink-200 p-3 transition hover:border-brand-300 hover:bg-brand-50/50"
-              >
-                <div className={`grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br ${q.tint} text-white shadow-soft`}>
-                  <q.icon className="h-5 w-5" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-ink-900">{q.label}</p>
-                  <p className="text-xs text-ink-400">{q.desc}</p>
-                </div>
-                <ArrowRight className="h-4 w-4 text-ink-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
-              </Link>
-            ))}
-          </div>
+        <div className="flex flex-col justify-between gap-3">
+          {quickAccess.map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              className="group flex flex-1 items-center gap-4 rounded-2xl border border-ink-200 bg-white p-4 shadow-card transition hover:border-brand-200 hover:shadow-soft"
+            >
+              <div className={`grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br ${item.tint} text-white shadow-soft`}>
+                <item.icon className="h-5 w-5" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-ink-900 group-hover:text-brand-600">{item.label}</p>
+                <p className="text-xs text-ink-400">{item.desc}</p>
+              </div>
+              <ArrowRight className="h-4 w-4 text-ink-300 transition group-hover:translate-x-0.5 group-hover:text-brand-600" />
+            </Link>
+          ))}
         </div>
       </div>
 
-      {/* Upcoming interviews reminder */}
       {!loading && interviews.length > 0 && (
         <div className="rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 to-white p-6 shadow-card">
-          <div className="mb-4 flex items-center gap-2.5">
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-brand-600 text-white shadow-soft">
+          <div className="mb-6 flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-600 text-white shadow-soft">
               <Bell className="h-5 w-5" />
             </div>
             <div>
               <h2 className="font-display text-lg font-bold text-ink-900">Upcoming interviews</h2>
-              <p className="text-xs text-ink-400">
-                {interviews.length} scheduled · next in {interviews[0].inDays} day{interviews[0].inDays === 1 ? '' : 's'}
-              </p>
+              <p className="text-sm text-ink-500">You have {interviews.length} interview{interviews.length === 1 ? '' : 's'} coming up.</p>
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {interviews.map((iv) => {
-              const FormatIcon = formatIcons[iv.format] ?? Video;
+              const FormatIcon = formatIcons[iv.type || iv.format] ?? Video;
+              const typeLabel = iv.type || iv.format || 'Google Meet';
+              const timeDisplay = iv.startTime || iv.time;
+              const timeRange = iv.endTime ? `${timeDisplay} – ${iv.endTime}` : timeDisplay;
+              const interviewerDisplay = iv.withName || iv.interviewerName;
+              const roleDisplay = iv.withRole || iv.interviewerRole;
+
               return (
-                <Link
-              key={iv.id}
-              to={`/app/interviews/${iv.id}`}
-              className="group rounded-xl border border-ink-200 bg-white p-4 transition hover:border-brand-300 hover:shadow-soft"
-                >
-                  
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold text-ink-900">{iv.jobTitle}</p>
-                      <p className="truncate text-xs text-ink-400">{iv.company}</p>
+                <div key={iv.id} className="group flex flex-col justify-between rounded-xl border border-ink-200 bg-white p-4 transition hover:border-brand-300 hover:shadow-soft">
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-ink-900">{iv.jobTitle}</p>
+                        <p className="truncate text-xs font-medium text-ink-500">{iv.company}</p>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${iv.inDays <= 3 ? 'bg-rose-50 text-rose-600' : iv.inDays <= 5 ? 'bg-amber-50 text-amber-600' : 'bg-brand-50 text-brand-600'}`}>
+                        {iv.inDays === 0 ? 'Today' : iv.inDays === 1 ? 'Tomorrow' : `${iv.inDays}d`}
+                      </span>
                     </div>
-                    <span
-                      className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${
-                        iv.inDays <= 3
-                          ? 'bg-rose-50 text-rose-600'
-                          : iv.inDays <= 5
-                            ? 'bg-amber-50 text-amber-600'
-                            : 'bg-brand-50 text-brand-600'
-                      }`}
-                    >
-                      {iv.inDays === 0 ? 'Today' : iv.inDays === 1 ? 'Tomorrow' : `${iv.inDays}d`}
-                    </span>
+                    <div className="mt-3 space-y-1.5 text-xs text-ink-600">
+                      <p className="flex items-center gap-1.5 font-medium">
+                        <Calendar className="h-3.5 w-3.5 text-brand-500 shrink-0" />
+                        {iv.date}
+                      </p>
+                      <p className="flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 text-brand-500 shrink-0" />
+                        {timeRange}
+                      </p>
+                      <p className="flex items-center gap-1.5">
+                        <FormatIcon className="h-3.5 w-3.5 text-brand-500 shrink-0" />
+                        <span>{typeLabel}</span>
+                      </p>
+                      {interviewerDisplay && (
+                        <p className="truncate text-ink-500 pt-0.5">
+                          👤 {interviewerDisplay}{roleDisplay ? ` — ${roleDisplay}` : ''}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="mt-3 space-y-1.5 text-xs text-ink-500">
-                    <p className="flex items-center gap-1.5">
-                      <Calendar className="h-3.5 w-3.5 text-brand-500" />
-                      {iv.date} · {iv.time}
-                    </p>
-                    <p className="flex items-center gap-1.5">
-                      <FormatIcon className="h-3.5 w-3.5 text-brand-500" />
-                      {iv.format}
-                    </p>
-                    <p className="truncate text-ink-400">
-                      with {iv.withName} · {iv.withRole}
-                    </p>
+                  <div className="mt-4 pt-3 border-t border-ink-100 flex items-center justify-between">
+                    <Link to={`/app/interviews/${iv.id}`} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-xs font-semibold text-white shadow-soft transition hover:bg-brand-700">
+                      View Interview
+                      <ArrowRight className="h-3 w-3" />
+                    </Link>
                   </div>
-                                </Link>
+                </div>
               );
             })}
           </div>
         </div>
       )}
 
-      {/* Recent applications */}
       <div className="rounded-2xl border border-ink-200 bg-white p-6 shadow-card">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-display text-lg font-bold text-ink-900">Recent applications</h2>

@@ -4,6 +4,7 @@ import type {
   Application,
   AppStatus,
   Interview,
+  InterviewInput,
   JobInput,
   CompanyApplication,
   NotificationItem,
@@ -78,14 +79,24 @@ export async function fetchApplicationById(
        i.id AS interview_id,
        i.date AS interview_date,
        i.time AS interview_time,
+       i.start_time AS interview_start_time,
+       i.end_time AS interview_end_time,
+       i.duration AS interview_duration,
+       i.type AS interview_type,
        i.format AS interview_format,
+       i.meeting_link AS interview_meeting_link,
+       i.location AS interview_location,
        i.with_name AS interview_with_name,
        i.with_role AS interview_with_role,
+       i.interviewer_name AS interview_interviewer_name,
+       i.interviewer_role AS interview_interviewer_role,
+       i.notes AS interview_notes,
+       i.status AS interview_status,
        i.in_days AS interview_in_days
      FROM applications a
      JOIN jobs j ON a.job_id = j.id
      JOIN users u ON a.user_id = u.id
-     LEFT JOIN interviews i ON i.user_id = a.user_id AND i.job_id = a.job_id
+     LEFT JOIN interviews i ON (i.application_id = a.id OR (i.user_id = a.user_id AND i.job_id = a.job_id))
      WHERE a.id = $1 AND (a.user_id = $2 OR j.company_id = $2)`,
     [applicationId, userId]
   );
@@ -111,18 +122,29 @@ export async function fetchApplicationById(
   };
 
   const interview: Interview | null = row.interview_id
-    ? {
+    ? mapInterviewFromRow({
+        ...row,
         id: row.interview_id,
-        jobId: row.job_id,
-        jobTitle: row.job_title,
+        job_id: row.job_id,
+        job_title: row.job_title,
         company: row.job_company,
         date: row.interview_date,
-        time: row.interview_time,
+        time: row.interview_time || row.interview_start_time,
+        start_time: row.interview_start_time,
+        end_time: row.interview_end_time,
+        duration: row.interview_duration,
+        type: row.interview_type,
         format: row.interview_format,
-        withName: row.interview_with_name,
-        withRole: row.interview_with_role,
-        inDays: row.interview_in_days,
-      }
+        meeting_link: row.interview_meeting_link,
+        location: row.interview_location,
+        with_name: row.interview_with_name,
+        with_role: row.interview_with_role,
+        interviewer_name: row.interview_interviewer_name,
+        interviewer_role: row.interview_interviewer_role,
+        notes: row.interview_notes,
+        status: row.interview_status,
+        in_days: row.interview_in_days,
+      })
     : null;
 
   return {
@@ -143,7 +165,6 @@ export async function fetchApplicationById(
     interview,
   };
 }
-
 
 export async function fetchAppliedJobIds(userId: string): Promise<string[]> {
   const db = await getDb();
@@ -286,14 +307,34 @@ export async function fetchCompanyApplications(
   const result = await db.query(
     `SELECT
        a.id AS application_id,
+       a.user_id AS candidate_user_id,
        a.status,
        a.applied_days_ago,
+       a.created_at AS application_created_at,
        u.full_name AS candidate_name,
        u.email AS candidate_email,
-       j.*
+       j.*,
+       i.id AS interview_id,
+       i.date AS interview_date,
+       i.time AS interview_time,
+       i.start_time AS interview_start_time,
+       i.end_time AS interview_end_time,
+       i.duration AS interview_duration,
+       i.type AS interview_type,
+       i.format AS interview_format,
+       i.meeting_link AS interview_meeting_link,
+       i.location AS interview_location,
+       i.with_name AS interview_with_name,
+       i.with_role AS interview_with_role,
+       i.interviewer_name AS interview_interviewer_name,
+       i.interviewer_role AS interview_interviewer_role,
+       i.notes AS interview_notes,
+       i.status AS interview_status,
+       i.in_days AS interview_in_days
      FROM applications a
      JOIN jobs j ON j.id = a.job_id
      JOIN users u ON u.id = a.user_id
+     LEFT JOIN interviews i ON (i.application_id = a.id OR (i.user_id = a.user_id AND i.job_id = a.job_id))
      WHERE j.company_id = $1
      ORDER BY a.created_at DESC`,
     [companyUserId]
@@ -301,12 +342,322 @@ export async function fetchCompanyApplications(
 
   return (result.rows as any[]).map((row) => ({
     id: row.application_id,
+    userId: row.candidate_user_id,
     status: row.status as AppStatus,
     appliedDaysAgo: row.applied_days_ago,
     candidateName: row.candidate_name,
     candidateEmail: row.candidate_email,
     job: mapJobFromRow(row),
+    createdAt: row.application_created_at
+      ? new Date(row.application_created_at).toISOString()
+      : undefined,
+    interview: row.interview_id
+      ? mapInterviewFromRow({
+          ...row,
+          id: row.interview_id,
+          job_id: row.id,
+          job_title: row.title,
+          company: row.company,
+          date: row.interview_date,
+          time: row.interview_time || row.interview_start_time,
+          start_time: row.interview_start_time,
+          end_time: row.interview_end_time,
+          duration: row.interview_duration,
+          type: row.interview_type,
+          format: row.interview_format,
+          meeting_link: row.interview_meeting_link,
+          location: row.interview_location,
+          with_name: row.interview_with_name,
+          with_role: row.interview_with_role,
+          interviewer_name: row.interview_interviewer_name,
+          interviewer_role: row.interview_interviewer_role,
+          notes: row.interview_notes,
+          status: row.interview_status,
+          in_days: row.interview_in_days,
+        })
+      : null,
   }));
+}
+
+export async function fetchApplicationForCompany(
+  companyUserId: string,
+  applicationId: string
+): Promise<CompanyApplication | null> {
+  const db = await getDb();
+
+  const result = await db.query(
+    `SELECT
+       a.id AS application_id,
+       a.user_id AS candidate_user_id,
+       a.status,
+       a.applied_days_ago,
+       a.created_at AS application_created_at,
+       u.full_name AS candidate_name,
+       u.email AS candidate_email,
+       j.*,
+       i.id AS interview_id,
+       i.date AS interview_date,
+       i.time AS interview_time,
+       i.start_time AS interview_start_time,
+       i.end_time AS interview_end_time,
+       i.duration AS interview_duration,
+       i.type AS interview_type,
+       i.format AS interview_format,
+       i.meeting_link AS interview_meeting_link,
+       i.location AS interview_location,
+       i.with_name AS interview_with_name,
+       i.with_role AS interview_with_role,
+       i.interviewer_name AS interview_interviewer_name,
+       i.interviewer_role AS interview_interviewer_role,
+       i.notes AS interview_notes,
+       i.status AS interview_status,
+       i.in_days AS interview_in_days
+     FROM applications a
+     JOIN jobs j ON j.id = a.job_id
+     JOIN users u ON u.id = a.user_id
+     LEFT JOIN interviews i ON (i.application_id = a.id OR (i.user_id = a.user_id AND i.job_id = a.job_id))
+     WHERE a.id = $1 AND j.company_id = $2`,
+    [applicationId, companyUserId]
+  );
+
+  if (result.rows.length === 0) return null;
+  const row = result.rows[0] as any;
+
+  return {
+    id: row.application_id,
+    userId: row.candidate_user_id,
+    status: row.status as AppStatus,
+    appliedDaysAgo: row.applied_days_ago,
+    candidateName: row.candidate_name,
+    candidateEmail: row.candidate_email,
+    job: mapJobFromRow(row),
+    createdAt: row.application_created_at
+      ? new Date(row.application_created_at).toISOString()
+      : undefined,
+    interview: row.interview_id
+      ? mapInterviewFromRow({
+          ...row,
+          id: row.interview_id,
+          job_id: row.id,
+          job_title: row.title,
+          company: row.company,
+          date: row.interview_date,
+          time: row.interview_time || row.interview_start_time,
+          start_time: row.interview_start_time,
+          end_time: row.interview_end_time,
+          duration: row.interview_duration,
+          type: row.interview_type,
+          format: row.interview_format,
+          meeting_link: row.interview_meeting_link,
+          location: row.interview_location,
+          with_name: row.interview_with_name,
+          with_role: row.interview_with_role,
+          interviewer_name: row.interview_interviewer_name,
+          interviewer_role: row.interview_interviewer_role,
+          notes: row.interview_notes,
+          status: row.interview_status,
+          in_days: row.interview_in_days,
+        })
+      : null,
+  };
+}
+
+export async function scheduleCompanyInterview(
+  companyUserId: string,
+  applicationId: string,
+  input: InterviewInput
+): Promise<string> {
+  const db = await getDb();
+
+  const ownedApplication = await db.query(
+    `SELECT a.id, a.user_id, a.job_id, j.title, j.company
+     FROM applications a
+     JOIN jobs j ON j.id = a.job_id
+     WHERE a.id = $1 AND j.company_id = $2`,
+    [applicationId, companyUserId]
+  );
+
+  if (!ownedApplication.rows.length) {
+    throw new Error('You can only schedule interviews for applications to your own jobs.');
+  }
+
+  const appRow = ownedApplication.rows[0] as any;
+  const candidateId = appRow.user_id;
+  const jobId = appRow.job_id;
+  const jobTitle = appRow.title;
+  const company = appRow.company;
+
+  let inDays = 3;
+  try {
+    const interviewDate = new Date(input.date);
+    if (!isNaN(interviewDate.getTime())) {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      interviewDate.setHours(0, 0, 0, 0);
+      const diffDays = Math.round((interviewDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      inDays = Math.max(0, diffDays);
+    }
+  } catch {
+    inDays = 3;
+  }
+
+  const format =
+    input.type === 'In Office'
+      ? 'On-site'
+      : input.type === 'Phone Call'
+      ? 'Phone screen'
+      : 'Video call';
+
+  const interviewerName = input.interviewerName.trim();
+  const interviewerRole = input.interviewerRole?.trim() || 'Hiring Team';
+
+  // Check if interview already exists for this application
+  const existingInterview = await db.query(
+    'SELECT id FROM interviews WHERE application_id = $1 OR (user_id = $2 AND job_id = $3)',
+    [applicationId, candidateId, jobId]
+  );
+
+  let interviewId: string;
+  const isReschedule = existingInterview.rows.length > 0;
+
+  if (isReschedule) {
+    interviewId = (existingInterview.rows[0] as any).id;
+    await db.query(
+      `UPDATE interviews
+       SET application_id = $1, user_id = $2, company_id = $3, job_id = $4,
+           date = $5, time = $6, start_time = $7, end_time = $8, duration = $9,
+           type = $10, format = $11, meeting_link = $12, location = $13,
+           with_name = $14, with_role = $15, interviewer_name = $16, interviewer_role = $17,
+           notes = $18, status = 'scheduled', in_days = $19, updated_at = now()
+       WHERE id = $20`,
+      [
+        applicationId,
+        candidateId,
+        companyUserId,
+        jobId,
+        input.date,
+        input.startTime,
+        input.startTime,
+        input.endTime || '',
+        input.duration || '45 mins',
+        input.type,
+        format,
+        input.meetingLink || '',
+        input.location || '',
+        interviewerName,
+        interviewerRole,
+        interviewerName,
+        interviewerRole,
+        input.notes || '',
+        inDays,
+        interviewId,
+      ]
+    );
+  } else {
+    interviewId = 'i' + Date.now();
+    await db.query(
+      `INSERT INTO interviews (
+         id, application_id, user_id, company_id, job_id,
+         date, time, start_time, end_time, duration,
+         type, format, meeting_link, location,
+         with_name, with_role, interviewer_name, interviewer_role,
+         notes, status, in_days, created_at, updated_at
+       ) VALUES (
+         $1, $2, $3, $4, $5,
+         $6, $7, $8, $9, $10,
+         $11, $12, $13, $14,
+         $15, $16, $17, $18,
+         $19, 'scheduled', $20, now(), now()
+       )`,
+      [
+        interviewId,
+        applicationId,
+        candidateId,
+        companyUserId,
+        jobId,
+        input.date,
+        input.startTime,
+        input.startTime,
+        input.endTime || '',
+        input.duration || '45 mins',
+        input.type,
+        format,
+        input.meetingLink || '',
+        input.location || '',
+        interviewerName,
+        interviewerRole,
+        interviewerName,
+        interviewerRole,
+        input.notes || '',
+        inDays,
+      ]
+    );
+  }
+
+  // Update application to accepted
+  await db.query(
+    'UPDATE applications SET status = $1, updated_at = now() WHERE id = $2',
+    ['accepted', applicationId]
+  );
+
+  // Create notification for candidate
+  try {
+    const notifId = 'n' + Date.now();
+    const actionTitle = isReschedule ? 'Interview Rescheduled' : 'Interview Scheduled';
+    const notifType = isReschedule ? 'interview_rescheduled' : 'interview_scheduled';
+    const message = `Your application for ${jobTitle} at ${company} has been accepted. Your interview is scheduled for ${input.date} at ${input.startTime} via ${input.type}.${input.meetingLink ? ` Meeting link: ${input.meetingLink}` : input.location ? ` Location: ${input.location}` : ''}`;
+
+    await db.query(
+      `INSERT INTO notifications (id, user_id, type, title, message, related_application_id, related_interview_id, is_read, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, false, now())`,
+      [notifId, candidateId, notifType, actionTitle, message, applicationId, interviewId]
+    );
+    notifyChange();
+  } catch (err) {
+    console.error('Failed to create interview notification:', err);
+  }
+
+  return interviewId;
+}
+
+export async function cancelCompanyInterview(
+  companyUserId: string,
+  interviewId: string,
+  reason?: string
+): Promise<void> {
+  const db = await getDb();
+
+  const existing = await db.query(
+    `SELECT i.*, j.title AS job_title, j.company, j.company_id
+     FROM interviews i
+     JOIN jobs j ON j.id = i.job_id
+     WHERE i.id = $1 AND j.company_id = $2`,
+    [interviewId, companyUserId]
+  );
+
+  if (!existing.rows.length) {
+    throw new Error('Interview not found or unauthorized.');
+  }
+
+  const row = existing.rows[0] as any;
+
+  await db.query(
+    `UPDATE interviews SET status = 'cancelled', updated_at = now() WHERE id = $1`,
+    [interviewId]
+  );
+
+  try {
+    const notifId = 'n' + Date.now();
+    const message = `Your interview for ${row.job_title} at ${row.company} scheduled for ${row.date} has been cancelled.${reason ? ` Reason: ${reason}` : ''}`;
+    await db.query(
+      `INSERT INTO notifications (id, user_id, type, title, message, related_interview_id, related_application_id, is_read, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, false, now())`,
+      [notifId, row.user_id, 'interview_rescheduled', 'Interview Cancelled', message, interviewId, row.application_id]
+    );
+    notifyChange();
+  } catch (err) {
+    console.error('Failed to create cancellation notification:', err);
+  }
 }
 
 export async function updateCompanyApplicationStatus(
@@ -359,21 +710,11 @@ export async function fetchInterviews(userId: string): Promise<Interview[]> {
   const result = await db.query(
     `SELECT i.*, j.title as job_title, j.company
      FROM interviews i JOIN jobs j ON i.job_id = j.id
-     WHERE i.user_id = $1 ORDER BY i.in_days ASC`,
+     WHERE i.user_id = $1 AND i.status != 'cancelled'
+     ORDER BY i.in_days ASC`,
     [userId]
   );
-  return (result.rows as any[]).map((row) => ({
-    id: row.id,
-    jobId: row.job_id,
-    jobTitle: row.job_title,
-    company: row.company,
-    date: row.date,
-    time: row.time,
-    format: row.format,
-    withName: row.with_name,
-    withRole: row.with_role,
-    inDays: row.in_days,
-  }));
+  return (result.rows as any[]).map(mapInterviewFromRow);
 }
 
 export async function fetchInterviewById(
@@ -385,27 +726,54 @@ export async function fetchInterviewById(
     `SELECT i.*, j.title AS job_title, j.company
      FROM interviews i
      JOIN jobs j ON i.job_id = j.id
-     WHERE i.id = $1 AND i.user_id = $2`,
+     WHERE i.id = $1 AND (i.user_id = $2 OR j.company_id = $2)`,
     [interviewId, userId]
   );
 
   if (result.rows.length === 0) return null;
 
-  const row = result.rows[0] as any;
+  return mapInterviewFromRow(result.rows[0]);
+}
+
+function mapInterviewFromRow(row: any): Interview {
+  const format =
+    row.format ||
+    (row.type === 'In Office'
+      ? 'On-site'
+      : row.type === 'Phone Call'
+      ? 'Phone screen'
+      : 'Video call');
 
   return {
-    id: row.id,
+    id: row.id || row.interview_id,
+    applicationId: row.application_id,
+    candidateId: row.user_id,
+    userId: row.user_id,
+    companyId: row.company_id,
     jobId: row.job_id,
-    jobTitle: row.job_title,
+    jobTitle: row.job_title || row.title,
     company: row.company,
-    date: row.date,
-    time: row.time,
-    format: row.format,
-    withName: row.with_name,
-    withRole: row.with_role,
-    inDays: row.in_days,
+    date: row.date || row.interview_date,
+    time: row.start_time || row.time || row.interview_time || '',
+    startTime: row.start_time || row.time || row.interview_start_time || '',
+    endTime: row.end_time || row.interview_end_time || '',
+    duration: row.duration || row.interview_duration || '45 mins',
+    type: row.type || row.interview_type || 'Google Meet',
+    format: format as Interview['format'],
+    meetingLink: row.meeting_link || row.interview_meeting_link || '',
+    location: row.location || row.interview_location || '',
+    withName: row.with_name || row.interviewer_name || row.interview_with_name || 'Hiring Manager',
+    withRole: row.with_role || row.interviewer_role || row.interview_with_role || 'Interviewer',
+    interviewerName: row.interviewer_name || row.with_name || row.interview_interviewer_name || '',
+    interviewerRole: row.interviewer_role || row.with_role || row.interview_interviewer_role || '',
+    notes: row.notes || row.interview_notes || '',
+    status: (row.status || row.interview_status || 'scheduled') as Interview['status'],
+    inDays: row.in_days ?? row.interview_in_days ?? 0,
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : undefined,
+    updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : undefined,
   };
 }
+
 
 export async function scheduleInterview(
   userId: string,

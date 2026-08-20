@@ -57,11 +57,16 @@ const statusConfig: Record<
   },
 };
 
-const formatIcons = {
+const formatIcons: Record<string, typeof Video> = {
+  'Google Meet': Video,
+  'Zoom': Video,
   'Video call': Video,
+  'In Office': MapPin,
   'On-site': MapPin,
+  'Phone Call': Phone,
   'Phone screen': Phone,
-} as const;
+  'Other': Globe,
+};
 
 function formatDate(dateStr: string): string {
   try {
@@ -327,23 +332,40 @@ export function ApplicationDetailPage() {
                         <Calendar className="h-3.5 w-3.5" /> Upcoming Interview
                       </span>
                       <h3 className="mt-2 font-display text-base font-bold text-ink-900">
-                        {interview.date} at {interview.time}
+                        {interview.date} at {interview.time || interview.startTime} {interview.duration ? `(${interview.duration})` : ''}
                       </h3>
                       <p className="mt-1 flex items-center gap-2 text-xs text-ink-500">
                         <FormatIcon className="h-3.5 w-3.5 text-brand-500" />
-                        <span>{interview.format}</span>
+                        <span>{interview.type || interview.format}</span>
                         <span>·</span>
-                        <span>with {interview.withName} ({interview.withRole})</span>
+                        <span>with {interview.withName || interview.interviewerName} ({interview.withRole || interview.interviewerRole})</span>
                       </p>
+                      {interview.location && (
+                        <p className="mt-1 text-xs text-ink-600 flex items-center gap-1">
+                          <MapPin className="h-3 w-3 text-ink-400" /> {interview.location}
+                        </p>
+                      )}
                     </div>
 
-                    <Link
-                      to={`/app/interviews/${interview.id}`}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700 self-start sm:self-center"
-                    >
-                      View Interview Details
-                      <ArrowRight className="h-4 w-4" />
-                    </Link>
+                    <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
+                      {interview.meetingLink && (
+                        <a
+                          href={interview.meetingLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-accent-600 px-4 py-2 text-xs font-bold text-white shadow-soft transition hover:bg-accent-700"
+                        >
+                          <Video className="h-3.5 w-3.5" /> Join Meeting
+                        </a>
+                      )}
+                      <Link
+                        to={`/app/interviews/${interview.id}`}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-xs font-semibold text-white shadow-soft transition hover:bg-brand-700"
+                      >
+                        View Details
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    </div>
                   </div>
                 </div>
               ) : (

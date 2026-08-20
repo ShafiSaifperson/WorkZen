@@ -11,6 +11,7 @@ import { CoverLetterPage } from '@/pages/CoverLetter';
 import { InterviewDetailPage } from '@/pages/InterviewDetail';
 import { NotificationsPage } from '@/pages/Notifications';
 import { CompanyDashboardPage } from '@/pages/CompanyDashboard';
+import { CompanyScheduleInterviewPage } from '@/pages/CompanyScheduleInterview';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { NotificationProvider } from '@/lib/notifications';
 
@@ -47,6 +48,10 @@ function CompanyRoutes() {
       <Routes>
         <Route path="/company" element={<AppShell user={user} onSignOut={signOut} />}>
           <Route path="dashboard" element={<CompanyDashboardPage />} />
+          <Route
+            path="applications/:applicationId/schedule-interview"
+            element={<CompanyScheduleInterviewPage />}
+          />
         </Route>
         <Route path="*" element={<Navigate to="/company/dashboard" replace />} />
       </Routes>

@@ -1,5 +1,23 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Briefcase, DollarSign, MapPin, Pencil, Plus, Tag, Trash2, Users } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Briefcase,
+  DollarSign,
+  MapPin,
+  Pencil,
+  Plus,
+  Tag,
+  Trash2,
+  Users,
+  Calendar,
+  Clock,
+  Video,
+  Phone,
+  CalendarClock,
+  XCircle,
+  CheckCircle2,
+  ExternalLink,
+} from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import {
   createCompanyJob,
@@ -8,6 +26,7 @@ import {
   fetchCompanyJobs,
   updateCompanyApplicationStatus,
   updateCompanyJob,
+  cancelCompanyInterview,
 } from '@/lib/data';
 import type { CompanyApplication, Job, JobInput } from '@/lib/types';
 
@@ -35,6 +54,7 @@ function demoFitScore(application: CompanyApplication) {
 
 export function CompanyDashboardPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<CompanyApplication[]>([]);
   const [form, setForm] = useState<JobInput>(() => emptyForm());
@@ -69,14 +89,14 @@ export function CompanyDashboardPage() {
 
   useEffect(() => {
     void loadDashboard();
-  }, [user?.id]);
+  }, [user]);
 
   function resetForm() {
-    setEditingJob(null);
     setForm(emptyForm(user?.full_name || 'My Company'));
     setTagsInput('');
     setSalaryMinInput('');
     setSalaryMaxInput('');
+    setEditingJob(null);
   }
 
   function startEdit(job: Job) {
@@ -157,6 +177,21 @@ export function CompanyDashboardPage() {
 
     try {
       await updateCompanyApplicationStatus(user.id, applicationId, status);
+      await loadDashboard();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  async function handleCancelInterview(interviewId: string) {
+    if (
+      !user ||
+      !window.confirm('Are you sure you want to cancel this interview? The candidate will be notified.')
+    )
+      return;
+
+    try {
+      await cancelCompanyInterview(user.id, interviewId, 'Cancelled by company hiring team.');
       await loadDashboard();
     } catch (err) {
       setError((err as Error).message);
@@ -421,44 +456,139 @@ export function CompanyDashboardPage() {
           AI-style fit score is a demo score based on job skills and profile details.
         </p>
 
-        <div className="space-y-3">
-          {applications.map((application) => (
-            <article key={application.id} className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
-              <div className="flex flex-col justify-between gap-4 sm:flex-row">
-                <div>
-                  <h3 className="font-semibold text-ink-900">{application.candidateName}</h3>
-                  <p className="text-sm text-ink-500">{application.candidateEmail}</p>
-                  <p className="mt-2 text-sm text-ink-700">
-                    Applied for <span className="font-semibold">{application.job.title}</span>
-                  </p>
+        <div className="space-y-4">
+          {applications.map((application) => {
+            const iv = application.interview;
+            const isAccepted = application.status === 'accepted';
+            const isRejected = application.status === 'rejected';
+            const isPending = application.status === 'pending';
+
+            return (
+              <article key={application.id} className="rounded-2xl border border-ink-200 bg-white p-5 shadow-card">
+                <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="font-display font-bold text-ink-900 text-lg">{application.candidateName}</h3>
+                      <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-bold text-brand-700 border border-brand-200">
+                        Demo AI fit: {demoFitScore(application)}%
+                      </span>
+                    </div>
+                    <p className="text-sm text-ink-500">{application.candidateEmail}</p>
+                    <p className="mt-2 text-sm text-ink-700">
+                      Applied for <span className="font-semibold">{application.job.title}</span> · {application.appliedDaysAgo}d ago
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-bold ${
+                        isAccepted
+                          ? 'bg-accent-50 text-accent-700 border border-accent-200'
+                          : isRejected
+                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                          : 'bg-brand-50 text-brand-700 border border-brand-200'
+                      }`}
+                    >
+                      {isAccepted ? 'Accepted' : isRejected ? 'Rejected' : 'Under Review'}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <span className="rounded-full bg-brand-50 px-3 py-1.5 text-sm font-bold text-brand-700">
-                    Demo AI fit: {demoFitScore(application)}%
-                  </span>
-                  <span className="rounded-full bg-ink-100 px-3 py-1.5 text-sm font-semibold text-ink-700">
-                    {application.status}
-                  </span>
-                </div>
-              </div>
+                {/* Scheduled Interview Details Card */}
+                {isAccepted && iv && (
+                  <div className="mt-4 rounded-xl border border-accent-200 bg-accent-50/40 p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1 rounded-md bg-accent-100 px-2 py-0.5 text-xs font-bold text-accent-800">
+                            <Calendar className="h-3.5 w-3.5 text-accent-600" />
+                            Interview Scheduled
+                          </span>
+                          <span className="text-xs font-semibold text-ink-700">
+                            {iv.type || iv.format}
+                          </span>
+                        </div>
+                        <p className="mt-2 font-display text-sm font-bold text-ink-900">
+                          {iv.date} at {iv.time || iv.startTime} ({iv.duration || '45 mins'})
+                        </p>
+                        <p className="text-xs text-ink-500 mt-0.5">
+                          with {iv.withName || iv.interviewerName} ({iv.withRole || iv.interviewerRole})
+                        </p>
+                        {iv.meetingLink && (
+                          <p className="mt-1 flex items-center gap-1 text-xs text-brand-600">
+                            <Video className="h-3 w-3" />
+                            <a
+                              href={iv.meetingLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-mono underline hover:text-brand-700 truncate max-w-sm"
+                            >
+                              {iv.meetingLink}
+                            </a>
+                          </p>
+                        )}
+                        {iv.location && (
+                          <p className="mt-1 flex items-center gap-1 text-xs text-ink-600">
+                            <MapPin className="h-3 w-3 text-ink-400" />
+                            <span>{iv.location}</span>
+                          </p>
+                        )}
+                      </div>
 
-              <div className="mt-4 flex gap-3">
-                <button
-                  onClick={() => void reviewApplication(application.id, 'accepted')}
-                  className="rounded-xl bg-accent-600 px-4 py-2 text-sm font-semibold text-white"
-                >
-                  Accept
-                </button>
-                <button
-                  onClick={() => void reviewApplication(application.id, 'rejected')}
-                  className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white"
-                >
-                  Reject
-                </button>
-              </div>
-            </article>
-          ))}
+                      <div className="flex items-center gap-2 self-start sm:self-center">
+                        <button
+                          onClick={() => navigate(`/company/applications/${application.id}/schedule-interview`)}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-ink-200 bg-white px-3 py-1.5 text-xs font-semibold text-ink-700 shadow-sm transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+                        >
+                          <CalendarClock className="h-3.5 w-3.5 text-brand-600" />
+                          Reschedule
+                        </button>
+                        <button
+                          onClick={() => void handleCancelInterview(iv.id)}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 shadow-sm transition hover:bg-rose-50"
+                        >
+                          <XCircle className="h-3.5 w-3.5 text-rose-600" />
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Actions for Pending application */}
+                {isPending && (
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <button
+                      onClick={() => navigate(`/company/applications/${application.id}/schedule-interview`)}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-accent-600 px-4 py-2 text-sm font-semibold text-white shadow-soft transition hover:bg-accent-700"
+                    >
+                      <Calendar className="h-4 w-4" />
+                      Accept & Schedule Interview
+                    </button>
+                    <button
+                      onClick={() => void reviewApplication(application.id, 'rejected')}
+                      className="rounded-xl border border-ink-200 bg-white px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
+
+                {/* Action for accepted application without interview */}
+                {isAccepted && !iv && (
+                  <div className="mt-4 flex items-center gap-3">
+                    <button
+                      onClick={() => navigate(`/company/applications/${application.id}/schedule-interview`)}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700"
+                    >
+                      <Calendar className="h-4 w-4" />
+                      Schedule Interview
+                    </button>
+                  </div>
+                )}
+              </article>
+            );
+          })}
 
           {!loading && applications.length === 0 && (
             <p className="rounded-2xl border border-dashed border-ink-300 bg-white p-8 text-sm text-ink-500">

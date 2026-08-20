@@ -50,15 +50,28 @@ CREATE TABLE IF NOT EXISTS applications (
 
 CREATE TABLE IF NOT EXISTS interviews (
   id TEXT PRIMARY KEY,
+  application_id TEXT REFERENCES applications(id) ON DELETE CASCADE,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  company_id TEXT REFERENCES users(id) ON DELETE SET NULL,
   job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
   date TEXT NOT NULL,
-  time TEXT NOT NULL,
-  format TEXT NOT NULL DEFAULT 'Video call',
+  time TEXT NOT NULL DEFAULT '',
+  start_time TEXT NOT NULL DEFAULT '',
+  end_time TEXT NOT NULL DEFAULT '',
+  duration TEXT NOT NULL DEFAULT '45 mins',
+  type TEXT NOT NULL DEFAULT 'Google Meet',
+  format TEXT NOT NULL DEFAULT 'Google Meet',
+  meeting_link TEXT NOT NULL DEFAULT '',
+  location TEXT NOT NULL DEFAULT '',
   with_name TEXT NOT NULL DEFAULT '',
   with_role TEXT NOT NULL DEFAULT '',
+  interviewer_name TEXT NOT NULL DEFAULT '',
+  interviewer_role TEXT NOT NULL DEFAULT '',
+  notes TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'scheduled',
   in_days INTEGER NOT NULL DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT now()
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS cover_letters (
@@ -85,8 +98,23 @@ CREATE TABLE IF NOT EXISTS notifications (
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'candidate';
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS company_id TEXT REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE applications ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
+ALTER TABLE interviews ADD COLUMN IF NOT EXISTS application_id TEXT REFERENCES applications(id) ON DELETE CASCADE;
+ALTER TABLE interviews ADD COLUMN IF NOT EXISTS company_id TEXT REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE interviews ADD COLUMN IF NOT EXISTS start_time TEXT NOT NULL DEFAULT '';
+ALTER TABLE interviews ADD COLUMN IF NOT EXISTS end_time TEXT NOT NULL DEFAULT '';
+ALTER TABLE interviews ADD COLUMN IF NOT EXISTS duration TEXT NOT NULL DEFAULT '45 mins';
+ALTER TABLE interviews ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'Google Meet';
+ALTER TABLE interviews ADD COLUMN IF NOT EXISTS meeting_link TEXT NOT NULL DEFAULT '';
+ALTER TABLE interviews ADD COLUMN IF NOT EXISTS location TEXT NOT NULL DEFAULT '';
+ALTER TABLE interviews ADD COLUMN IF NOT EXISTS interviewer_name TEXT NOT NULL DEFAULT '';
+ALTER TABLE interviews ADD COLUMN IF NOT EXISTS interviewer_role TEXT NOT NULL DEFAULT '';
+ALTER TABLE interviews ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT '';
+ALTER TABLE interviews ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'scheduled';
+ALTER TABLE interviews ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
 CREATE INDEX IF NOT EXISTS idx_applications_user_id ON applications(user_id);
 CREATE INDEX IF NOT EXISTS idx_interviews_user_id ON interviews(user_id);
+CREATE INDEX IF NOT EXISTS idx_interviews_application_id ON interviews(application_id);
+CREATE INDEX IF NOT EXISTS idx_interviews_company_id ON interviews(company_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_company_id ON jobs(company_id);
 CREATE INDEX IF NOT EXISTS idx_user_identities_user_id ON user_identities(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
@@ -134,11 +162,11 @@ ON CONFLICT (id) DO NOTHING;
 `;
 
 const INTERVIEW_SEED = `
-INSERT INTO interviews (id, user_id, job_id, date, time, format, with_name, with_role, in_days) VALUES
-  ('i1', 'u1', 'j5', 'Aug 3, 2026', '10:00 AM', 'Video call', 'Sarah Chen', 'Engineering Manager', 3),
-  ('i2', 'u1', 'j5', 'Aug 6, 2026', '2:00 PM', 'On-site', 'David Park', 'Tech Lead', 6),
-  ('i3', 'u1', 'j2', 'Aug 4, 2026', '11:30 AM', 'Video call', 'Maria Lopez', 'Design Director', 4),
-  ('i4', 'u2', 'j5', 'Aug 5, 2026', '1:00 PM', 'Phone screen', 'James Wu', 'Recruiter', 5)
+INSERT INTO interviews (id, application_id, user_id, company_id, job_id, date, time, start_time, end_time, duration, type, format, meeting_link, location, with_name, with_role, interviewer_name, interviewer_role, notes, status, in_days) VALUES
+  ('i1', 'a3', 'u1', 'u-company', 'j5', 'Aug 3, 2026', '10:00 AM', '10:00 AM', '11:00 AM', '60 mins', 'Google Meet', 'Google Meet', 'https://meet.google.com/orb-full-eng', '', 'Sarah Chen', 'Engineering Manager', 'Sarah Chen', 'Engineering Manager', 'We will discuss system architecture and previous React/Node.js projects.', 'scheduled', 3),
+  ('i2', 'a3', 'u1', 'u-company', 'j5', 'Aug 6, 2026', '2:00 PM', '2:00 PM', '3:00 PM', '60 mins', 'In Office', 'On-site', '', '100 Market St, Floor 4, Austin, TX', 'David Park', 'Tech Lead', 'David Park', 'Tech Lead', 'On-site technical deep dive and team meet-and-greet.', 'scheduled', 6),
+  ('i3', 'a4', 'u1', 'u-company', 'j2', 'Aug 4, 2026', '11:30 AM', '11:30 AM', '12:15 PM', '45 mins', 'Zoom', 'Zoom', 'https://zoom.us/j/9876543210', '', 'Maria Lopez', 'Design Director', 'Maria Lopez', 'Design Director', 'Portfolio presentation and design system walkthrough.', 'scheduled', 4),
+  ('i4', 'a7', 'u2', 'u-company', 'j5', 'Aug 5, 2026', '1:00 PM', '1:00 PM', '1:30 PM', '30 mins', 'Phone Call', 'Phone screen', '', '+1 (555) 234-5678', 'James Wu', 'Recruiter', 'James Wu', 'Recruiter', 'Initial 30-minute culture and background screening call.', 'scheduled', 5)
 ON CONFLICT (id) DO NOTHING;
 `;
 
