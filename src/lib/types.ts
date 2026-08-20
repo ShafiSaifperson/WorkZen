@@ -135,3 +135,23 @@ export interface CompanyApplication {
   candidateEmail: string;
   job: Job;
 }
+
+export type NotificationType =
+  | 'application_accepted'
+  | 'application_rejected'
+  | 'application_submitted'
+  | 'interview_scheduled'
+  | 'interview_rescheduled';
+
+export interface NotificationItem {
+  id: string;
+  userId: string;
+  type: NotificationType | string;
+  title: string;
+  message: string;
+  relatedApplicationId?: string | null;
+  relatedInterviewId?: string | null;
+  isRead: boolean;
+  createdAt: string;
+}
+

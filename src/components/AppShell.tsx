@@ -4,7 +4,8 @@ import {
   type ChangeEvent,
   type FormEvent,
 } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';import {
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import {
   LayoutDashboard,
   Briefcase,
   FileText,
@@ -16,6 +17,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';import {
   Building2,
 } from 'lucide-react';
 import type { AuthUser } from '@/lib/auth';
+import { useNotifications } from '@/lib/notifications';
 import { Logo } from '@/components/ui/Logo';
 
 interface AppShellProps {
@@ -46,18 +48,20 @@ export function AppShell({ user, onSignOut }: AppShellProps) {
   const fullName = user.full_name || '';
   const email = user.email ?? '';
   const initials = getInitials(fullName, email);
-    const navigate = useNavigate();
+  const navigate = useNavigate();
+  const { unreadCount } = useNotifications();
   const [searchQuery, setSearchQuery] = useState('');
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
-const [profileImage, setProfileImage] = useState<string | null>(() => {
-  return localStorage.getItem(`workzen-profile-image-${user.id}`);
-});
+  const [profileImage, setProfileImage] = useState<string | null>(() => {
+    return localStorage.getItem(`workzen-profile-image-${user.id}`);
+  });
 
-const profileImageInputRef = useRef<HTMLInputElement>(null);
+  const profileImageInputRef = useRef<HTMLInputElement>(null);
   const nav = user.role === 'company' ? companyNav : candidateNav;
 
-function submitSearch(event: FormEvent<HTMLFormElement>) {    event.preventDefault();
+  function submitSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     const trimmedQuery = searchQuery.trim();
 
     navigate(
@@ -68,42 +72,43 @@ function submitSearch(event: FormEvent<HTMLFormElement>) {    event.preventDefau
   }
 
   function handleProfileImageChange(event: ChangeEvent<HTMLInputElement>) {
-  const selectedFile = event.target.files?.[0];
+    const selectedFile = event.target.files?.[0];
 
-  if (!selectedFile) return;
+    if (!selectedFile) return;
 
-  if (!selectedFile.type.startsWith('image/')) {
-    window.alert('Please choose an image file.');
-    return;
-  }
-
-  if (selectedFile.size > 2 * 1024 * 1024) {
-    window.alert('Please choose an image smaller than 2 MB.');
-    return;
-  }
-
-  const reader = new FileReader();
-
-  reader.onload = () => {
-    const imageData = String(reader.result);
-
-    try {
-      localStorage.setItem(`workzen-profile-image-${user.id}`, imageData);
-      setProfileImage(imageData);
-      setProfileMenuOpen(false);
-    } catch {
-      window.alert('The image could not be saved. Please choose a smaller image.');
+    if (!selectedFile.type.startsWith('image/')) {
+      window.alert('Please choose an image file.');
+      return;
     }
-  };
 
-  reader.readAsDataURL(selectedFile);
+    if (selectedFile.size > 2 * 1024 * 1024) {
+      window.alert('Please choose an image smaller than 2 MB.');
+      return;
+    }
 
-  // Lets the user select the same image again later if wanted.
-  event.target.value = '';
-}
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const imageData = String(reader.result);
+
+      try {
+        localStorage.setItem(`workzen-profile-image-${user.id}`, imageData);
+        setProfileImage(imageData);
+        setProfileMenuOpen(false);
+      } catch {
+        window.alert('The image could not be saved. Please choose a smaller image.');
+      }
+    };
+
+    reader.readAsDataURL(selectedFile);
+
+    // Lets the user select the same image again later if wanted.
+    event.target.value = '';
+  }
 
   return (
-<div className="min-h-screen bg-matcha-50">      {/* Sidebar */}
+    <div className="min-h-screen bg-matcha-50">
+      {/* Sidebar */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-ink-200 bg-white lg:flex">
         <div className="px-5 py-6">
           <Logo />
@@ -148,12 +153,27 @@ function submitSearch(event: FormEvent<HTMLFormElement>) {    event.preventDefau
         <div className="sticky top-0 z-40 border-b border-ink-200 bg-white/90 px-4 py-3 backdrop-blur">
           <div className="flex items-center justify-between">
             <Logo />
-            <button
-              onClick={onSignOut}
-              className="rounded-lg p-2 text-ink-500 hover:bg-ink-100"
-            >
-              <LogOut className="h-5 w-5" />
-            </button>
+            <div className="flex items-center gap-1.5">
+              <Link
+                to="/app/notifications"
+                aria-label={`Notifications (${unreadCount} unread)`}
+                className="relative rounded-lg p-2 text-ink-500 hover:bg-ink-100 hover:text-ink-900"
+              >
+                <Bell className="h-5 w-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow-sm ring-2 ring-white">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </Link>
+              <button
+                onClick={onSignOut}
+                aria-label="Sign out"
+                className="rounded-lg p-2 text-ink-500 hover:bg-ink-100"
+              >
+                <LogOut className="h-5 w-5" />
+              </button>
+            </div>
           </div>
           <nav className="mt-3 flex gap-1 overflow-x-auto scrollbar-thin">
             {nav.map((item) => (
@@ -181,21 +201,29 @@ function submitSearch(event: FormEvent<HTMLFormElement>) {    event.preventDefau
         {/* Desktop top bar */}
         <header className="sticky top-0 z-30 hidden items-center justify-between border-b border-ink-200 bg-white/80 px-8 py-4 backdrop-blur lg:flex">
           <form onSubmit={submitSearch} className="relative w-72">
-  <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-  <input
-    value={searchQuery}
-    onChange={(event) => setSearchQuery(event.target.value)}
-    placeholder="Search jobs, companies…"
-    aria-label="Search jobs and companies"
-    className="h-10 w-full rounded-xl border border-ink-200 bg-ink-50 pl-11 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100"
-  />
-</form>
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+            <input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search jobs, companies…"
+              aria-label="Search jobs and companies"
+              className="h-10 w-full rounded-xl border border-ink-200 bg-ink-50 pl-11 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100"
+            />
+          </form>
           <div className="flex items-center gap-3">
-            <button className="relative rounded-xl p-2.5 text-ink-500 transition hover:bg-ink-100">
+            <Link
+              to="/app/notifications"
+              aria-label={`Notifications (${unreadCount} unread)`}
+              className="relative rounded-xl p-2.5 text-ink-500 transition hover:bg-ink-100 hover:text-ink-900"
+            >
               <Bell className="h-5 w-5" />
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-accent-500 ring-2 ring-white" />
-            </button>
-           <div className="relative">
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[11px] font-bold text-white shadow-sm ring-2 ring-white">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </Link>
+            <div className="relative">
   <input
     ref={profileImageInputRef}
     type="file"

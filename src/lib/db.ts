@@ -69,12 +69,26 @@ CREATE TABLE IF NOT EXISTS cover_letters (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS notifications (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  related_application_id TEXT,
+  related_interview_id TEXT,
+  is_read BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'candidate';
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS company_id TEXT REFERENCES users(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_applications_user_id ON applications(user_id);
 CREATE INDEX IF NOT EXISTS idx_interviews_user_id ON interviews(user_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_company_id ON jobs(company_id);
 CREATE INDEX IF NOT EXISTS idx_user_identities_user_id ON user_identities(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at);
 `;
 
 const JOB_SEED = `
@@ -126,6 +140,19 @@ INSERT INTO interviews (id, user_id, job_id, date, time, format, with_name, with
 ON CONFLICT (id) DO NOTHING;
 `;
 
+const NOTIFICATION_SEED = `
+INSERT INTO notifications (id, user_id, type, title, message, related_application_id, related_interview_id, is_read, created_at) VALUES
+  ('n1', 'u1', 'interview_scheduled', 'Interview Scheduled', 'Upcoming interview for Full-Stack Engineer at Orbital Inc on Aug 3, 2026 at 10:00 AM.', NULL, 'i1', false, now() - interval '2 hours'),
+  ('n2', 'u1', 'application_accepted', 'Application Accepted! 🎉', 'Congratulations! Your application for Full-Stack Engineer at Orbital Inc was accepted.', 'a3', NULL, false, now() - interval '1 day'),
+  ('n3', 'u1', 'interview_scheduled', 'Interview Scheduled', 'Upcoming interview for Product Design Intern at Lumen Studio on Aug 4, 2026 at 11:30 AM.', NULL, 'i3', true, now() - interval '2 days'),
+  ('n4', 'u1', 'application_accepted', 'Application Accepted! 🎉', 'Congratulations! Your application for Product Design Intern at Lumen Studio was accepted.', 'a4', NULL, true, now() - interval '3 days'),
+  ('n5', 'u1', 'application_rejected', 'Application Status Update', 'Thank you for your interest in the Data Analyst Intern role at Meridian Bank. The team has moved forward with other candidates.', 'a5', NULL, true, now() - interval '4 days'),
+  ('n6', 'u1', 'application_submitted', 'Application Submitted', 'Your application for Frontend Engineer at Northwind Labs was submitted successfully.', 'a1', NULL, true, now() - interval '5 days'),
+  ('n7', 'u2', 'interview_scheduled', 'Interview Scheduled', 'Upcoming interview for Full-Stack Engineer at Orbital Inc on Aug 5, 2026 at 1:00 PM.', NULL, 'i4', false, now() - interval '1 day'),
+  ('n8', 'u2', 'application_accepted', 'Application Accepted! 🎉', 'Congratulations! Your application for Full-Stack Engineer at Orbital Inc was accepted.', 'a7', NULL, false, now() - interval '2 days')
+ON CONFLICT (id) DO NOTHING;
+`;
+
 let dbInstance: PGlite | null = null;
 let initPromise: Promise<PGlite> | null = null;
 
@@ -136,8 +163,10 @@ async function initDb(): Promise<PGlite> {
   await db.exec(USER_SEED);
   await db.exec(APP_SEED);
   await db.exec(INTERVIEW_SEED);
+  await db.exec(NOTIFICATION_SEED);
   return db;
 }
+
 
 export async function getDb(): Promise<PGlite> {
   if (!dbInstance) {
