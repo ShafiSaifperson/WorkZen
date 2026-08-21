@@ -112,8 +112,11 @@ export async function testHfToken(
     const data = await res.json();
     const reply = data.choices?.[0]?.message?.content || 'connected';
     return { success: true, message: `Connected! Hugging Face model responded: "${reply.trim()}"` };
-  } catch (err: any) {
-    return { success: false, message: err.message || 'Network connection failed.' };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      message: err instanceof Error ? err.message : 'Network connection failed.',
+    };
   }
 }
 
@@ -656,7 +659,7 @@ Your Instructions:
     const data = await res.json();
     const rawReply = data.choices?.[0]?.message?.content || '';
     return extractChatAction(rawReply);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[HF API] Exception caught:', error);
     return generateOfflineHelperReply(lastUserPrompt, resumeText, targetRole);
   }

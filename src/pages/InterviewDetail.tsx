@@ -19,11 +19,10 @@ import {
   Check,
   FileText,
   Globe,
-  Sparkles,
 } from 'lucide-react';
 import { fetchInterviewById, rescheduleInterview } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
-import type { Interview, InterviewType } from '@/lib/types';
+import type { Interview } from '@/lib/types';
 
 const formatIcons: Record<string, typeof Video> = {
   'Google Meet': Video,
@@ -35,6 +34,12 @@ const formatIcons: Record<string, typeof Video> = {
   'Phone screen': Phone,
   'Other': Globe,
 };
+
+function toStoredInterviewFormat(format: string): 'Video call' | 'On-site' | 'Phone screen' {
+  if (format === 'In Office' || format === 'On-site') return 'On-site';
+  if (format === 'Phone Call' || format === 'Phone screen') return 'Phone screen';
+  return 'Video call';
+}
 
 function DetailRow({
   icon: Icon,
@@ -78,7 +83,7 @@ export function InterviewDetailPage() {
   const [isRescheduling, setIsRescheduling] = useState(false);
   const [newDate, setNewDate] = useState('');
   const [newTime, setNewTime] = useState('');
-  const [newFormat, setNewFormat] = useState<string>('Google Meet');
+  const [newFormat, setNewFormat] = useState<Interview['format']>('Google Meet');
   const [savingReschedule, setSavingReschedule] = useState(false);
   const [rescheduleSuccess, setRescheduleSuccess] = useState(false);
 
@@ -115,7 +120,7 @@ export function InterviewDetailPage() {
       await rescheduleInterview(user.id, interview.id, {
         date: newDate,
         time: newTime,
-        format: newFormat as any,
+        format: toStoredInterviewFormat(newFormat),
         inDays: Math.max(1, interview.inDays),
       });
 
@@ -126,7 +131,7 @@ export function InterviewDetailPage() {
               date: newDate,
               time: newTime,
               startTime: newTime,
-              format: newFormat as any,
+              format: newFormat,
               type: newFormat,
             }
           : null

@@ -1,3 +1,5 @@
+/* eslint-disable no-useless-escape */
+
 /**
  * Resume Exporter & Formatter Utility
  * Provides professional ATS-standard export formatting for PDF, DOCX (Word), TXT, and Markdown.

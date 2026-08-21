@@ -2,8 +2,6 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
-  Calendar,
-  Clock,
   MapPin,
   Phone,
   Video,
@@ -15,8 +13,6 @@ import {
   Loader2,
   CalendarCheck,
   Globe,
-  Sparkles,
-  FileText,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { fetchApplicationForCompany, scheduleCompanyInterview } from '@/lib/data';

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, useCallback, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Briefcase,
@@ -10,18 +10,10 @@ import {
   Trash2,
   Users,
   Calendar,
-  Clock,
   Video,
-  Phone,
   CalendarClock,
   XCircle,
-  CheckCircle2,
-  ExternalLink,
   MoreVertical,
-  Building2,
-  Sparkles,
-  ShieldCheck,
-  Check,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import {
@@ -79,7 +71,7 @@ export function CompanyDashboardPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadDashboard() {
+  const loadDashboard = useCallback(async () => {
     if (!user) return;
 
     setLoading(true);
@@ -98,11 +90,11 @@ export function CompanyDashboardPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [user]);
 
   useEffect(() => {
     void loadDashboard();
-  }, [user]);
+  }, [loadDashboard]);
 
   function resetForm() {
     setForm(emptyForm(user?.full_name || 'My Company'));

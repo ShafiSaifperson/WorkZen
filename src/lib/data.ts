@@ -12,6 +12,8 @@ import type {
   ApplicationDetail,
 } from './types';
 
+type DatabaseRow = Record<string, never>;
+
 function notifyChange() {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('workzen:notifications_updated'));
@@ -21,14 +23,14 @@ function notifyChange() {
 export async function fetchJobs(): Promise<Job[]> {
   const db = await getDb();
   const result = await db.query('SELECT * FROM jobs ORDER BY created_at DESC');
-  return (result.rows as any[]).map(mapJob);
+  return (result.rows as DatabaseRow[]).map(mapJob);
 }
 
 export async function fetchJobById(id: string): Promise<Job | null> {
   const db = await getDb();
   const result = await db.query('SELECT * FROM jobs WHERE id = $1', [id]);
   if (result.rows.length === 0) return null;
-  return mapJob(result.rows[0] as any);
+  return mapJob(result.rows[0] as DatabaseRow);
 }
 
 export async function fetchApplications(userId: string): Promise<Application[]> {
@@ -39,7 +41,7 @@ export async function fetchApplications(userId: string): Promise<Application[]> 
      WHERE a.user_id = $1 ORDER BY a.created_at DESC`,
     [userId]
   );
-  return (result.rows as any[]).map((row) => ({
+  return (result.rows as DatabaseRow[]).map((row) => ({
     id: row.id,
     job: mapJobFromRow(row),
     status: row.status as AppStatus,
@@ -103,7 +105,7 @@ export async function fetchApplicationById(
 
   if (result.rows.length === 0) return null;
 
-  const row = result.rows[0] as any;
+  const row = result.rows[0] as DatabaseRow;
 
   const job: Job = {
     id: row.job_id,
@@ -169,7 +171,7 @@ export async function fetchApplicationById(
 export async function fetchAppliedJobIds(userId: string): Promise<string[]> {
   const db = await getDb();
   const result = await db.query('SELECT job_id FROM applications WHERE user_id = $1', [userId]);
-  return (result.rows as any[]).map((r) => r.job_id);
+  return (result.rows as DatabaseRow[]).map((r) => r.job_id);
 }
 
 export async function applyToJob(userId: string, jobId: string): Promise<void> {
@@ -182,7 +184,7 @@ export async function applyToJob(userId: string, jobId: string): Promise<void> {
 
   try {
     const jobRes = await db.query('SELECT title, company FROM jobs WHERE id = $1', [jobId]);
-    const job = jobRes.rows[0] as any;
+    const job = jobRes.rows[0] as DatabaseRow;
     const jobTitle = job?.title || 'Role';
     const company = job?.company || 'Company';
 
@@ -212,7 +214,7 @@ export async function fetchCompanyJobs(companyUserId: string): Promise<Job[]> {
     [companyUserId]
   );
 
-  return (result.rows as any[]).map(mapJob);
+  return (result.rows as DatabaseRow[]).map(mapJob);
 }
 
 export async function createCompanyJob(
@@ -340,7 +342,7 @@ export async function fetchCompanyApplications(
     [companyUserId]
   );
 
-  return (result.rows as any[]).map((row) => ({
+  return (result.rows as DatabaseRow[]).map((row) => ({
     id: row.application_id,
     userId: row.candidate_user_id,
     status: row.status as AppStatus,
@@ -421,7 +423,7 @@ export async function fetchApplicationForCompany(
   );
 
   if (result.rows.length === 0) return null;
-  const row = result.rows[0] as any;
+  const row = result.rows[0] as DatabaseRow;
 
   return {
     id: row.application_id,
@@ -481,7 +483,7 @@ export async function scheduleCompanyInterview(
     throw new Error('You can only schedule interviews for applications to your own jobs.');
   }
 
-  const appRow = ownedApplication.rows[0] as any;
+  const appRow = ownedApplication.rows[0] as DatabaseRow;
   const candidateId = appRow.user_id;
   const jobId = appRow.job_id;
   const jobTitle = appRow.title;
@@ -521,7 +523,7 @@ export async function scheduleCompanyInterview(
   const isReschedule = existingInterview.rows.length > 0;
 
   if (isReschedule) {
-    interviewId = (existingInterview.rows[0] as any).id;
+    interviewId = (existingInterview.rows[0] as DatabaseRow).id;
     await db.query(
       `UPDATE interviews
        SET application_id = $1, user_id = $2, company_id = $3, job_id = $4,
@@ -639,7 +641,7 @@ export async function cancelCompanyInterview(
     throw new Error('Interview not found or unauthorized.');
   }
 
-  const row = existing.rows[0] as any;
+  const row = existing.rows[0] as DatabaseRow;
 
   await db.query(
     `UPDATE interviews SET status = 'cancelled', updated_at = now() WHERE id = $1`,
@@ -679,7 +681,7 @@ export async function updateCompanyApplicationStatus(
     throw new Error('You can only review applications for your own jobs.');
   }
 
-  const appRow = ownedApplication.rows[0] as any;
+  const appRow = ownedApplication.rows[0] as DatabaseRow;
 
   await db.query(
     'UPDATE applications SET status = $1, updated_at = now() WHERE id = $2',
@@ -714,7 +716,7 @@ export async function fetchInterviews(userId: string): Promise<Interview[]> {
      ORDER BY i.in_days ASC`,
     [userId]
   );
-  return (result.rows as any[]).map(mapInterviewFromRow);
+  return (result.rows as DatabaseRow[]).map(mapInterviewFromRow);
 }
 
 export async function fetchInterviewById(
@@ -732,10 +734,10 @@ export async function fetchInterviewById(
 
   if (result.rows.length === 0) return null;
 
-  return mapInterviewFromRow(result.rows[0]);
+  return mapInterviewFromRow(result.rows[0] as DatabaseRow);
 }
 
-function mapInterviewFromRow(row: any): Interview {
+function mapInterviewFromRow(row: DatabaseRow): Interview {
   const format =
     row.format ||
     (row.type === 'In Office'
@@ -807,7 +809,7 @@ export async function scheduleInterview(
 
   try {
     const jobRes = await db.query('SELECT title, company FROM jobs WHERE id = $1', [jobId]);
-    const job = jobRes.rows[0] as any;
+    const job = jobRes.rows[0] as DatabaseRow;
     const jobTitle = job?.title || 'Role';
     const company = job?.company || 'Company';
 
@@ -854,7 +856,7 @@ export async function rescheduleInterview(
     throw new Error('Interview not found');
   }
 
-  const row = existing.rows[0] as any;
+  const row = existing.rows[0] as DatabaseRow;
   const format = details.format ?? row.format;
   const inDays = details.inDays ?? row.in_days;
 
@@ -891,7 +893,7 @@ export async function fetchNotifications(userId: string): Promise<NotificationIt
     `SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC`,
     [userId]
   );
-  return (result.rows as any[]).map((row) => ({
+  return (result.rows as DatabaseRow[]).map((row) => ({
     id: row.id,
     userId: row.user_id,
     type: row.type,
@@ -910,7 +912,7 @@ export async function fetchUnreadNotificationCount(userId: string): Promise<numb
     `SELECT COUNT(*) as count FROM notifications WHERE user_id = $1 AND is_read = false`,
     [userId]
   );
-  return parseInt((result.rows[0] as any)?.count || '0', 10);
+  return parseInt((result.rows[0] as DatabaseRow)?.count || '0', 10);
 }
 
 export async function markNotificationAsRead(userId: string, notificationId: string): Promise<void> {
@@ -978,11 +980,11 @@ export async function createNotification(
   return notifId;
 }
 
-function mapJob(row: any): Job {
+function mapJob(row: DatabaseRow): Job {
   return mapJobFromRow(row);
 }
 
-function mapJobFromRow(row: any): Job {
+function mapJobFromRow(row: DatabaseRow): Job {
   return {
     id: row.id,
     title: row.title,

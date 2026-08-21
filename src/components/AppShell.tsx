@@ -23,10 +23,18 @@ import {
   UserCheck,
   BarChart3,
   Settings,
+  Link2,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import type { AuthUser } from '@/lib/auth';
 import { useNotifications } from '@/lib/notifications';
 import { Logo } from '@/components/ui/Logo';
+import {
+  getSocialMediaLinks,
+  saveSocialMediaLinks,
+  type SocialMediaLink,
+} from '@/lib/socialLinks';
 
 interface AppShellProps {
   user: AuthUser;
@@ -67,6 +75,59 @@ export function AppShell({ user, onSignOut }: AppShellProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [socialLinksModalOpen, setSocialLinksModalOpen] = useState(false);
+  const [socialLinks, setSocialLinks] = useState<SocialMediaLink[]>([]);
+
+  function createEmptySocialLink(): SocialMediaLink {
+    return {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      platform: '',
+      url: '',
+    };
+  }
+
+  function openSocialLinksModal() {
+    const savedLinks = getSocialMediaLinks(user.id);
+    setSocialLinks(savedLinks.length > 0 ? savedLinks : [createEmptySocialLink()]);
+    setProfileMenuOpen(false);
+    setSocialLinksModalOpen(true);
+  }
+
+  function updateSocialLink(id: string, field: 'platform' | 'url', value: string) {
+    setSocialLinks((currentLinks) =>
+      currentLinks.map((link) => (link.id === id ? { ...link, [field]: value } : link))
+    );
+  }
+
+  function removeSocialLink(id: string) {
+    setSocialLinks((currentLinks) => {
+      const remainingLinks = currentLinks.filter((link) => link.id !== id);
+      return remainingLinks.length > 0 ? remainingLinks : [createEmptySocialLink()];
+    });
+  }
+
+  function saveSocialLinks() {
+    const cleanedLinks = socialLinks
+      .map((link) => ({ ...link, platform: link.platform.trim(), url: link.url.trim() }))
+      .filter((link) => link.url);
+
+    for (const link of cleanedLinks) {
+      try {
+        const parsedUrl = new URL(link.url);
+        if (!['http:', 'https:'].includes(parsedUrl.protocol)) throw new Error('Invalid URL protocol');
+      } catch {
+        window.alert(`"${link.url}" is not a valid link. Include https:// at the beginning.`);
+        return;
+      }
+    }
+
+    try {
+      saveSocialMediaLinks(user.id, cleanedLinks);
+      setSocialLinksModalOpen(false);
+    } catch {
+      window.alert('Your social links could not be saved. Please try again.');
+    }
+  }
 
   const [profileImage, setProfileImage] = useState<string | null>(() => {
     return localStorage.getItem(`workzen-profile-image-${user.id}`);
@@ -144,12 +205,12 @@ export function AppShell({ user, onSignOut }: AppShellProps) {
                     key={item.to}
                     to={item.to}
                     end={item.to === '/app/dashboard' || item.to === '/company/dashboard'}
-                    onClick={() => {
-                      if (item.hash) {
-                        const el = document.getElementById(item.hash);
-                        if (el) el.scrollIntoView({ behavior: 'smooth' });
-                      }
-                    }}
+                   onClick={() => {
+                      if ('hash' in item && typeof item.hash === 'string') {
+    const el = document.getElementById(item.hash);
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
+  }
+}}
                     className={({ isActive }) =>
                       `${'hiddenOnLg' in item && item.hiddenOnLg ? 'hidden 2xl:flex' : 'flex'} group items-center gap-1.5 lg:gap-2 rounded-xl px-2.5 lg:px-3 py-1.5 lg:py-2 text-xs lg:text-sm font-medium whitespace-nowrap shrink-0 transition ${
                         isActive
@@ -288,6 +349,16 @@ export function AppShell({ user, onSignOut }: AppShellProps) {
                       </Link>
                     )}
 
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={openSocialLinksModal}
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-200 transition hover:bg-white/10 hover:text-white"
+                    >
+                      <Link2 className="h-4 w-4 text-sky-400" />
+                      Link Social Media
+                    </button>
+
                     <div className="my-1 border-t border-[#242E49]" />
 
                     <button
@@ -358,6 +429,122 @@ export function AppShell({ user, onSignOut }: AppShellProps) {
       <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10">
         <Outlet />
       </main>
+            {socialLinksModalOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="social-links-title"
+        >
+          <div className="w-full max-w-xl rounded-2xl border border-[#2B3558] bg-[#181A2F] p-5 shadow-2xl sm:p-6">
+            <div className="flex items-start justify-between gap-4 border-b border-[#242E49] pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-sky-500/15 text-sky-400">
+                    <Link2 className="h-5 w-5" />
+                  </div>
+                  <h2
+                    id="social-links-title"
+                    className="text-base font-bold text-white"
+                  >
+                    Link Social Media
+                  </h2>
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-slate-400">
+                  Add your LinkedIn, GitHub, portfolio, or any other social-media URL.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSocialLinksModalOpen(false)}
+                aria-label="Close social media links popup"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-white/10 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-5 max-h-[50vh] space-y-3 overflow-y-auto pr-1">
+              {socialLinks.map((link, index) => (
+                <div
+                  key={link.id}
+                  className="rounded-xl border border-[#2B3558] bg-[#111427] p-3"
+                >
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-xs font-semibold text-slate-200">
+                      Social link {index + 1}
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={() => removeSocialLink(link.id)}
+                      className="rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-500/10 hover:text-rose-400"
+                      aria-label={`Remove social link ${index + 1}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-[140px_1fr]">
+                    <input
+                      value={link.platform}
+                      onChange={(event) =>
+                        updateSocialLink(link.id, 'platform', event.target.value)
+                      }
+                      placeholder="Platform, e.g. LinkedIn"
+                      className="h-10 rounded-xl border border-[#2B3558] bg-[#181A2F] px-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
+                    />
+
+                    <input
+                      type="url"
+                      value={link.url}
+                      onChange={(event) =>
+                        updateSocialLink(link.id, 'url', event.target.value)
+                      }
+                      placeholder="https://linkedin.com/in/your-name"
+                      className="h-10 rounded-xl border border-[#2B3558] bg-[#181A2F] px-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                setSocialLinks((currentLinks) => [
+                  ...currentLinks,
+                  createEmptySocialLink(),
+                ])
+              }
+              className="mt-4 inline-flex items-center gap-2 rounded-xl border border-dashed border-violet-400/50 px-3 py-2 text-xs font-semibold text-violet-300 transition hover:border-violet-400 hover:bg-violet-500/10"
+            >
+              <Plus className="h-4 w-4" />
+              Add more
+            </button>
+
+            <div className="mt-5 flex justify-end gap-3 border-t border-[#242E49] pt-4">
+              <button
+                type="button"
+                onClick={() => setSocialLinksModalOpen(false)}
+                className="rounded-xl border border-[#2B3558] px-4 py-2 text-xs font-semibold text-slate-300 transition hover:bg-white/5 hover:text-white"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={saveSocialLinks}
+                className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-violet-500"
+              >
+                <Link2 className="h-4 w-4" />
+                Connect links
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Upload,
@@ -101,6 +101,43 @@ export function ResumeCoachPage() {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
 
+  const processResume = useCallback(async (rawText: string, fileName: string, fileSize: string) => {
+    const cleanText = sanitizeAndCleanText(rawText);
+
+    setResumeData({
+      rawText: cleanText,
+      originalRawText: cleanText,
+      fileName,
+      fileSize,
+      uploadedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    });
+    setAppliedChanges([]);
+    setHistoryStack([]);
+    setManualEditText(cleanText);
+    setIsEditingManually(false);
+
+    setAnalyzing(true);
+    try {
+      const generatedReport = await analyzeResumeWithHF(cleanText, targetRole);
+      setReport(generatedReport);
+
+      const aiMsg: ChatMessage = {
+        id: `a_${Date.now()}`,
+        role: 'ai',
+        text: `🎯 **ATS Analysis Completed for ${targetRole}!**\n\n` +
+          `• **Overall Match Score:** **${generatedReport.overallScore}/100**\n` +
+          `• **Quantified Metrics Found:** ${generatedReport.stats.metricsCount}\n` +
+          `• **Identified Skills:** ${generatedReport.detectedSkills.slice(0, 5).join(', ')}${generatedReport.detectedSkills.length > 5 ? '…' : ''}\n\n` +
+          `You can click **"Apply"** on any suggestion in the report, or chat with me to make custom rewrites and additions!`,
+      };
+      setMessages((prev) => [...prev, aiMsg]);
+    } catch (err) {
+      console.error('Error analyzing resume:', err);
+    } finally {
+      setAnalyzing(false);
+    }
+  }, [targetRole]);
+
   // Prevent browser from opening dragged files in a new tab
   useEffect(() => {
     const preventDefault = (e: DragEvent) => {
@@ -162,7 +199,7 @@ export function ResumeCoachPage() {
       savedResume.fileName,
       savedResume.fileSize
     );
-  }, [searchParams, user]);
+  }, [searchParams, user, processResume]);
 
   async function applyForSelectedJob() {
     if (!user || !selectedJob || alreadyApplied) return;
@@ -181,43 +218,7 @@ export function ResumeCoachPage() {
     }
   }
 
-  // Handle Resume Upload & Analysis
-  async function processResume(rawText: string, fileName: string, fileSize: string) {
-    const cleanText = sanitizeAndCleanText(rawText);
 
-    setResumeData({
-      rawText: cleanText,
-      originalRawText: cleanText,
-      fileName,
-      fileSize,
-      uploadedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    });
-    setAppliedChanges([]);
-    setHistoryStack([]);
-    setManualEditText(cleanText);
-    setIsEditingManually(false);
-
-    setAnalyzing(true);
-    try {
-      const generatedReport = await analyzeResumeWithHF(cleanText, targetRole);
-      setReport(generatedReport);
-
-      const aiMsg: ChatMessage = {
-        id: `a_${Date.now()}`,
-        role: 'ai',
-        text: `🎯 **ATS Analysis Completed for ${targetRole}!**\n\n` +
-          `• **Overall Match Score:** **${generatedReport.overallScore}/100**\n` +
-          `• **Quantified Metrics Found:** ${generatedReport.stats.metricsCount}\n` +
-          `• **Identified Skills:** ${generatedReport.detectedSkills.slice(0, 5).join(', ')}${generatedReport.detectedSkills.length > 5 ? '…' : ''}\n\n` +
-          `You can click **"Apply"** on any suggestion in the report, or chat with me to make custom rewrites and additions!`,
-      };
-      setMessages((prev) => [...prev, aiMsg]);
-    } catch (err) {
-      console.error('Error analyzing resume:', err);
-    } finally {
-      setAnalyzing(false);
-    }
-  }
 
   async function handleFile(file: File) {
     if (!file) return;

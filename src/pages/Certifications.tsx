@@ -4,7 +4,6 @@ import {
   Copy,
   ExternalLink,
   FileText,
-  FileUp,
   Image,
   Trash2,
   Upload,

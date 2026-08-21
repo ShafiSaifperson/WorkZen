@@ -16,7 +16,6 @@ import {
   TrendingUp,
   Loader2,
   Bell,
-  Award,
   ChevronRight,
   FolderKanban,
 } from 'lucide-react';

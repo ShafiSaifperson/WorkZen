@@ -1,8 +1,33 @@
+/* eslint-disable no-useless-escape */
+
 export interface SampleResume {
   name: string;
   role: string;
   fileName: string;
   text: string;
+}
+
+interface PdfTextItem {
+  str: string;
+  transform: number[];
+  width: number;
+  height: number;
+}
+
+interface PdfJsLibrary {
+  GlobalWorkerOptions: { workerSrc: string };
+  getDocument: (source: { data: Uint8Array }) => {
+    promise: Promise<{
+      numPages: number;
+      getPage: (pageNumber: number) => Promise<{
+        getTextContent: () => Promise<{ items: PdfTextItem[] }>;
+      }>;
+    }>;
+  };
+}
+
+interface MammothLibrary {
+  extractRawText: (input: { arrayBuffer: ArrayBuffer }) => Promise<{ value?: string }>;
 }
 
 export const SAMPLE_RESUMES: SampleResume[] = [
@@ -151,7 +176,12 @@ export function sanitizeAndCleanText(raw: string): string {
     .replace(/&mdash;/g, '—');
 
   // 3. Remove non-printable control characters (except newline, carriage return, and tab)
-  cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '');
+  cleaned = [...cleaned]
+    .filter((character) => {
+      const code = character.charCodeAt(0);
+      return code === 9 || code === 10 || code === 13 || (code >= 32 && (code < 127 || code > 159));
+    })
+    .join('');
 
   return normalizeResumeText(cleaned);
 }
@@ -215,13 +245,18 @@ export async function extractTextFromFile(file: File): Promise<string> {
  * Preserves multi-column headers, section titles, lines, and bullet lists accurately.
  */
 async function extractTextFromPdfWithLayout(buffer: ArrayBuffer): Promise<string> {
-  const win = window as any;
+  const win = window as Window & { pdfjsLib?: PdfJsLibrary };
   if (!win.pdfjsLib) {
     await new Promise<void>((resolve, reject) => {
       const script = document.createElement('script');
       script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
       script.onload = () => {
-        win.pdfjsLib.GlobalWorkerOptions.workerSrc =
+        const pdfjs = win.pdfjsLib;
+        if (!pdfjs) {
+          reject(new Error('PDF parser library failed to load.'));
+          return;
+        }
+        pdfjs.GlobalWorkerOptions.workerSrc =
           'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
         resolve();
       };
@@ -230,19 +265,16 @@ async function extractTextFromPdfWithLayout(buffer: ArrayBuffer): Promise<string
     });
   }
 
-  const loadingTask = win.pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
+  const pdfjs = win.pdfjsLib;
+  if (!pdfjs) throw new Error('PDF parser library failed to load.');
+  const loadingTask = pdfjs.getDocument({ data: new Uint8Array(buffer) });
   const pdf = await loadingTask.promise;
   const pageSections: string[] = [];
 
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
     const textContent = await page.getTextContent();
-    const items = textContent.items as Array<{
-      str: string;
-      transform: number[];
-      width: number;
-      height: number;
-    }>;
+    const items = textContent.items;
 
     if (!items || items.length === 0) continue;
 
@@ -327,7 +359,7 @@ async function extractTextFromPdfWithLayout(buffer: ArrayBuffer): Promise<string
  * Extracts clean, unpolluted text from DOCX binary using Mammoth library.
  */
 async function extractTextFromDocxWithMammoth(buffer: ArrayBuffer): Promise<string> {
-  const win = window as any;
+  const win = window as Window & { mammoth?: MammothLibrary };
   if (!win.mammoth) {
     await new Promise<void>((resolve, reject) => {
       const script = document.createElement('script');
@@ -338,7 +370,9 @@ async function extractTextFromDocxWithMammoth(buffer: ArrayBuffer): Promise<stri
     });
   }
 
-  const result = await win.mammoth.extractRawText({ arrayBuffer: buffer });
+  const mammoth = win.mammoth;
+  if (!mammoth) throw new Error('DOCX parser library failed to load.');
+  const result = await mammoth.extractRawText({ arrayBuffer: buffer });
   return result.value || '';
 }
 
@@ -351,7 +385,7 @@ async function extractTextFromDocxWithMammoth(buffer: ArrayBuffer): Promise<stri
 export function normalizeResumeText(raw: string): string {
   if (!raw) return '';
 
-  let lines = raw
+  const lines = raw
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
     .split('\n')
