@@ -606,10 +606,10 @@ export function ResumeCoachPage() {
       {/* Page Header */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-display text-2xl font-bold text-ink-900 sm:text-3xl">
+          <h1 className="font-display text-2xl font-bold text-white sm:text-3xl">
             AI Resume Coach
           </h1>
-          <p className="mt-1 text-sm text-ink-500">
+          <p className="mt-1 text-sm text-slate-400">
             ATS scoring, conversational modifications, 1-click bullet point updates, and instant download.
           </p>
         </div>
@@ -933,7 +933,7 @@ export function ResumeCoachPage() {
                       ? 'Ask coach to rewrite a bullet, remove a sentence, add keywords…'
                       : 'Upload a resume or ask any resume coaching question…'
                   }
-                  className="h-11 flex-1 rounded-xl border border-ink-200 bg-ink-50 px-4 text-sm outline-none transition focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100"
+                  className="h-11 flex-1 rounded-xl border border-ink-200 bg-ink-50 px-4 text-sm text-slate-900 outline-none transition focus:border-brand-400 focus:bg-white focus:ring-2 focus:ring-brand-100"
                 />
                 <button
                   onClick={() => handleSendMessage()}

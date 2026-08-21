@@ -95,8 +95,8 @@ function openApplicationOptions(jobId: string) {
       {/* Header */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="font-display text-2xl font-bold text-ink-900 sm:text-3xl">Find Jobs</h1>
-          <p className="mt-1 text-sm text-ink-500">
+          <h1 className="font-display text-2xl font-bold text-white sm:text-3xl">Find Jobs</h1>
+          <p className="mt-1 text-sm text-slate-400">
             {aiResults ? 'AI-matched roles based on your resume' : 'Search open positions and apply in one click'}
           </p>
         </div>
@@ -161,7 +161,7 @@ function openApplicationOptions(jobId: string) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by title, company, or skill…"
-            className="h-12 w-full rounded-xl border border-ink-200 bg-white pl-12 pr-4 text-sm shadow-soft outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+            className="h-12 w-full rounded-xl border border-ink-200 bg-white pl-12 pr-4 text-sm text-slate-900 placeholder:text-ink-400 shadow-soft outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
           />
         </div>
         <button
@@ -255,8 +255,8 @@ function openApplicationOptions(jobId: string) {
       )}
 
       {/* Results count */}
-      <p className="mb-4 text-sm text-ink-500">
-        Showing <span className="font-semibold text-ink-900">{filtered.length}</span>{' '}
+      <p className="mb-4 text-sm text-slate-400">
+        Showing <span className="font-semibold text-white">{filtered.length}</span>{' '}
         {filtered.length === 1 ? 'role' : 'roles'}
       </p>
 

@@ -133,16 +133,16 @@ export function NotificationsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="font-display text-2xl font-bold text-ink-900 sm:text-3xl">
+            <h1 className="font-display text-2xl font-bold text-white sm:text-3xl">
               Notifications
             </h1>
             {unreadCount > 0 && (
-              <span className="inline-flex items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-bold text-brand-700 border border-brand-200">
+              <span className="inline-flex items-center rounded-full bg-violet-500/20 px-2.5 py-0.5 text-xs font-bold text-violet-300 border border-violet-500/30">
                 {unreadCount} unread
               </span>
             )}
           </div>
-          <p className="mt-1 text-sm text-ink-500">
+          <p className="mt-1 text-sm text-slate-400">
             Stay updated on application progress, interview schedules, and employer responses.
           </p>
         </div>

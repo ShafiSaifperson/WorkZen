@@ -33,8 +33,8 @@ export function CoverLetterPage() {
     return (
       <div className="mx-auto max-w-5xl animate-fade-in">
         <div className="mb-6">
-          <h1 className="font-display text-2xl font-bold text-ink-900 sm:text-3xl">Cover Letter Generator</h1>
-          <p className="mt-1 text-sm text-ink-500">
+          <h1 className="font-display text-2xl font-bold text-white sm:text-3xl">Cover Letter Generator</h1>
+          <p className="mt-1 text-sm text-slate-400">
             Pick a job and let AI craft a tailored cover letter in seconds.
           </p>
         </div>
@@ -83,8 +83,8 @@ Alex Kim`;
   return (
     <div className="mx-auto max-w-5xl animate-fade-in">
       <div className="mb-6">
-        <h1 className="font-display text-2xl font-bold text-ink-900 sm:text-3xl">Cover Letter Generator</h1>
-        <p className="mt-1 text-sm text-ink-500">
+        <h1 className="font-display text-2xl font-bold text-white sm:text-3xl">Cover Letter Generator</h1>
+        <p className="mt-1 text-sm text-slate-400">
           Pick a job and let AI craft a tailored cover letter in seconds.
         </p>
       </div>

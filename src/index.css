@@ -10,7 +10,12 @@
     text-rendering: optimizeLegibility;
   }
   body {
-    @apply bg-matcha-50 text-ink-900 font-sans;
+    @apply bg-[#0B0D1B] text-slate-100 font-sans;
+  }
+  input:not([class*="text-"]),
+  textarea:not([class*="text-"]),
+  select:not([class*="text-"]) {
+    color: #0f172a;
   }
   ::selection {
     @apply bg-brand-200 text-brand-900;
