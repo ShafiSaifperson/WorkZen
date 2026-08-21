@@ -1,10 +1,33 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, Loader2, AlertCircle, Building2, User, Briefcase } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, Loader2, AlertCircle, Building2, User } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { Logo } from '@/components/ui/Logo';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/lib/auth';
-import { signInWithFacebook, signInWithGoogle } from '@/lib/socialAuth';
+import { signInWithGoogle } from '@/lib/socialAuth';
+
+function GoogleIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24">
+      <path
+        fill="#4285F4"
+        d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+      />
+    </svg>
+  );
+}
 
 interface AuthShellProps {
   title: string;
@@ -60,7 +83,8 @@ function AuthShell({ title, subtitle, children, footer, onPrimary, primaryLabel,
       </div>
 
       {/* Right — form */}
-<div className="flex min-h-screen items-center justify-center bg-matcha-50 px-6 py-12 sm:px-12">        <div className="w-full max-w-sm animate-fade-in">
+      <div className="flex min-h-screen items-center justify-center bg-matcha-50 px-6 py-12 sm:px-12">
+        <div className="w-full max-w-sm animate-fade-in">
           <div className="mb-8 lg:hidden">
             <Logo />
           </div>
@@ -110,26 +134,9 @@ export function LoginPage() {
     setSubmitting(true);
 
     try {
-      const user = await signInWithOAuthProfile(await signInWithGoogle());
-      if (user.role === 'company') {
-        navigate('/company/dashboard');
-      } else {
-        navigate('/app/dashboard');
-      }
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function handleFacebookSignIn() {
-    setError(null);
-    setSubmitting(true);
-
-    try {
-      const user = await signInWithOAuthProfile(await signInWithFacebook());
-      if (user.role === 'company') {
+      const profile = await signInWithGoogle();
+      const user = await signInWithOAuthProfile(profile);
+      if (user.role === 'company' || user.role === 'admin') {
         navigate('/company/dashboard');
       } else {
         navigate('/app/dashboard');
@@ -147,7 +154,7 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       const user = await signIn(email, password);
-      if (user.role === 'company') {
+      if (user.role === 'company' || user.role === 'admin') {
         navigate('/company/dashboard');
       } else {
         navigate('/app/dashboard');
@@ -179,25 +186,16 @@ export function LoginPage() {
       }
     >
       <ErrorBanner message={error} />
-      <div className="grid grid-cols-2 gap-3">
+      <div>
         <Button
           type="button"
           variant="outline"
-          className="w-full"
+          className="w-full flex items-center justify-center gap-2.5 h-12 rounded-xl border-ink-200 bg-white font-medium text-ink-800 shadow-soft hover:bg-ink-50 hover:text-ink-900 transition"
           disabled={submitting}
           onClick={handleGoogleSignIn}
         >
-          Google
-        </Button>
-
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full"
-          disabled={submitting}
-          onClick={handleFacebookSignIn}
-        >
-          Facebook
+          <GoogleIcon className="h-4 w-4 shrink-0" />
+          <span>Continue with Google</span>
         </Button>
       </div>
 
@@ -252,7 +250,7 @@ export function LoginPage() {
 
 export function SignupPage() {
   const navigate = useNavigate();
-  const { signUp } = useAuth();
+  const { signUp, signInWithOAuthProfile } = useAuth();
   const [accountType, setAccountType] = useState<'candidate' | 'company'>('candidate');
   const [showPw, setShowPw] = useState(false);
   const [firstName, setFirstName] = useState('');
@@ -263,6 +261,32 @@ export function SignupPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  async function handleGoogleSignUp() {
+    setError(null);
+    setSubmitting(true);
+    try {
+      const profile = await signInWithGoogle();
+      const desiredFullName = accountType === 'company'
+        ? (companyName.trim() || ownerName.trim() || profile.fullName)
+        : (firstName || lastName ? `${firstName} ${lastName}`.trim() : profile.fullName);
+
+      const user = await signInWithOAuthProfile(profile, {
+        role: accountType,
+        fullName: desiredFullName,
+      });
+
+      if (user.role === 'company' || user.role === 'admin') {
+        navigate('/company/dashboard');
+      } else {
+        navigate('/app/dashboard');
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -344,6 +368,26 @@ export function SignupPage() {
           <Building2 className="h-4 w-4" />
           Company Owner
         </button>
+      </div>
+
+      {/* Google Sign Up */}
+      <div>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full flex items-center justify-center gap-2.5 h-12 rounded-xl border-ink-200 bg-white font-medium text-ink-800 shadow-soft hover:bg-ink-50 hover:text-ink-900 transition"
+          disabled={submitting}
+          onClick={handleGoogleSignUp}
+        >
+          <GoogleIcon className="h-4 w-4 shrink-0" />
+          <span>{accountType === 'company' ? 'Continue with Google as Company' : 'Continue with Google'}</span>
+        </Button>
+      </div>
+
+      <div className="flex items-center gap-3 text-xs text-ink-400">
+        <span className="h-px flex-1 bg-ink-200" />
+        or sign up with email
+        <span className="h-px flex-1 bg-ink-200" />
       </div>
 
       {accountType === 'candidate' ? (

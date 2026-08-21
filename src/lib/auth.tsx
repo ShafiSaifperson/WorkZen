@@ -7,7 +7,7 @@ import { getDb } from './db';
   full_name: string;
 }
   */
- export type UserRole = 'candidate' | 'company';
+export type UserRole = 'candidate' | 'company' | 'admin';
 
 export interface AuthUser {
   id: string;
@@ -15,7 +15,7 @@ export interface AuthUser {
   full_name: string;
   role: UserRole;
 }
-export type OAuthProvider = 'google' | 'facebook';
+export type OAuthProvider = 'google';
 
 export interface OAuthProfile {
   provider: OAuthProvider;
@@ -24,12 +24,21 @@ export interface OAuthProfile {
   fullName: string;
 }
 
-export async function signInWithOAuthProfile(profile: OAuthProfile): Promise<AuthUser> {
+export interface OAuthSignInOptions {
+  role?: UserRole;
+  fullName?: string;
+}
+
+export async function signInWithOAuthProfile(
+  profile: OAuthProfile,
+  options?: OAuthSignInOptions
+): Promise<AuthUser> {
   const db = await getDb();
   const email = profile.email.toLowerCase().trim();
+  const requestedRole = options?.role ?? 'candidate';
 
   const identity = await db.query(
-    `SELECT u.id, u.email, u.full_name
+    `SELECT u.id, u.email, u.full_name, u.role
      FROM user_identities i
      JOIN users u ON u.id = i.user_id
      WHERE i.provider = $1 AND i.provider_user_id = $2`,
@@ -38,32 +47,66 @@ export async function signInWithOAuthProfile(profile: OAuthProfile): Promise<Aut
 
   let user: AuthUser;
 
-  if (identity.rows.length) {
-    user = identity.rows[0] as AuthUser;
+  if (identity.rows.length > 0) {
+    const row = identity.rows[0] as { id: string; email: string; full_name: string; role?: string };
+    let effectiveRole: UserRole = (row.role === 'company' || row.role === 'admin')
+      ? (row.role as UserRole)
+      : 'candidate';
+
+    // If explicitly signing up as company/admin, upgrade role if needed
+    if ((options?.role === 'company' || options?.role === 'admin') && effectiveRole === 'candidate') {
+      effectiveRole = options.role;
+      await db.query('UPDATE users SET role = $1 WHERE id = $2', [effectiveRole, row.id]);
+    }
+
+    user = {
+      id: row.id,
+      email: row.email,
+      full_name: row.full_name || profile.fullName || email.split('@')[0],
+      role: effectiveRole,
+    };
   } else {
     const existing = await db.query(
       'SELECT id, email, full_name, role FROM users WHERE email = $1',
       [email]
     );
 
-    if (existing.rows.length) {
-      user = existing.rows[0] as AuthUser;
-    } else {
+    if (existing.rows.length > 0) {
+      const row = existing.rows[0] as { id: string; email: string; full_name: string; role?: string };
+      let effectiveRole: UserRole = (row.role === 'company' || row.role === 'admin')
+        ? (row.role as UserRole)
+        : (options?.role ?? 'candidate');
+
+      if ((options?.role === 'company' || options?.role === 'admin') && row.role !== effectiveRole) {
+        effectiveRole = options.role;
+        await db.query('UPDATE users SET role = $1 WHERE id = $2', [effectiveRole, row.id]);
+      }
+
       user = {
-  id: `u${crypto.randomUUID()}`,
-  email,
-  full_name: profile.fullName || email.split('@')[0],
-  role: 'candidate',
-};
+        id: row.id,
+        email: row.email,
+        full_name: row.full_name || profile.fullName || email.split('@')[0],
+        role: effectiveRole,
+      };
+    } else {
+      const fullName = options?.fullName?.trim() || profile.fullName?.trim() || email.split('@')[0];
+      user = {
+        id: `u${crypto.randomUUID()}`,
+        email,
+        full_name: fullName,
+        role: requestedRole,
+      };
 
       await db.query(
-        'INSERT INTO users (id, email, password, full_name) VALUES ($1, $2, $3, $4)',
-        [user.id, user.email, crypto.randomUUID(), user.full_name]
+        'INSERT INTO users (id, email, password, full_name, role) VALUES ($1, $2, $3, $4, $5)',
+        [user.id, user.email, crypto.randomUUID(), user.full_name, user.role]
       );
     }
 
     await db.query(
-      'INSERT INTO user_identities (id, user_id, provider, provider_user_id) VALUES ($1, $2, $3, $4)',
+      `INSERT INTO user_identities (id, user_id, provider, provider_user_id)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (provider, provider_user_id) DO UPDATE SET user_id = EXCLUDED.user_id`,
       [crypto.randomUUID(), user.id, profile.provider, profile.providerUserId]
     );
   }
@@ -75,7 +118,6 @@ export async function signInWithOAuthProfile(profile: OAuthProfile): Promise<Aut
 export async function signInWithPassword(email: string, password: string): Promise<AuthUser> {
   const db = await getDb();
   const result = await db.query(
-    
     'SELECT id, email, full_name, role FROM users WHERE email = $1 AND password = $2',
     [email.toLowerCase().trim(), password]
   );
@@ -125,7 +167,7 @@ export function getStoredUser(): AuthUser | null {
       id: user.id,
       email: user.email,
       full_name: user.full_name ?? '',
-      role: user.role === 'company' ? 'company' : 'candidate',
+      role: user.role === 'company' || user.role === 'admin' ? user.role : 'candidate',
     };
   } catch {
     return null;
@@ -139,7 +181,7 @@ export function signOut(): void {
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
-  signInWithOAuthProfile: (profile: OAuthProfile) => Promise<AuthUser>;
+  signInWithOAuthProfile: (profile: OAuthProfile, options?: OAuthSignInOptions) => Promise<AuthUser>;
   signIn: (email: string, password: string) => Promise<AuthUser>;
   signUp: (email: string, password: string, fullName: string, role?: UserRole) => Promise<AuthUser>;
   signOut: () => void;
@@ -198,8 +240,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }
 
-  async function handleOAuthProfile(profile: OAuthProfile) {
-    const u = await signInWithOAuthProfile(profile);
+  async function handleOAuthProfile(profile: OAuthProfile, options?: OAuthSignInOptions) {
+    const u = await signInWithOAuthProfile(profile, options);
     setUser(u);
     return u;
   }
@@ -222,7 +264,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   return useContext(AuthContext);
-  
-
-  
 }

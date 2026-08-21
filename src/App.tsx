@@ -87,7 +87,7 @@ function AppContent() {
   }
 
   if (!user) return <PublicRoutes />;
-  return user.role === 'company' ? <CompanyRoutes /> : <CandidateRoutes />;
+  return (user.role === 'company' || user.role === 'admin') ? <CompanyRoutes /> : <CandidateRoutes />;
 }
 
 export default function App() {

@@ -59,7 +59,7 @@ export function AppShell({ user, onSignOut }: AppShellProps) {
   });
 
   const profileImageInputRef = useRef<HTMLInputElement>(null);
-  const nav = user.role === 'company' ? companyNav : candidateNav;
+  const nav = (user.role === 'company' || user.role === 'admin') ? companyNav : candidateNav;
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

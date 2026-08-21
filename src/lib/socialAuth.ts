@@ -13,19 +13,6 @@ declare global {
         };
       };
     };
-    FB?: {
-      init: (options: Record<string, unknown>) => void;
-      login: (
-        callback: (response: { authResponse?: unknown }) => void,
-        options: { scope: string }
-      ) => void;
-      api: (
-        path: string,
-        params: Record<string, string>,
-        callback: (response: { id?: string; email?: string; name?: string }) => void
-      ) => void;
-    };
-    fbAsyncInit?: () => void;
   }
 }
 
@@ -78,7 +65,7 @@ export async function signInWithGoogle(): Promise<OAuthProfile> {
 
   if (!response.ok) throw new Error('Could not load your Google profile.');
 
-  const user = await response.json() as {
+  const user = (await response.json()) as {
     sub: string;
     email: string;
     name?: string;
@@ -87,44 +74,6 @@ export async function signInWithGoogle(): Promise<OAuthProfile> {
   return {
     provider: 'google',
     providerUserId: user.sub,
-    email: user.email,
-    fullName: user.name ?? '',
-  };
-}
-
-export async function signInWithFacebook(): Promise<OAuthProfile> {
-  const appId = import.meta.env.VITE_FACEBOOK_APP_ID;
-  if (!appId) throw new Error('Facebook sign-in is not configured.');
-
-  await loadScript('https://connect.facebook.net/en_US/sdk.js');
-
-  await new Promise<void>((resolve) => {
-    window.FB?.init({
-      appId,
-      cookie: false,
-      xfbml: false,
-      version: 'v23.0',
-    });
-    resolve();
-  });
-
-  const login = await new Promise<{ authResponse?: unknown }>((resolve) => {
-    window.FB?.login(resolve, { scope: 'public_profile,email' });
-  });
-
-  if (!login.authResponse) throw new Error('Facebook sign-in was cancelled.');
-
-  const user = await new Promise<{ id?: string; email?: string; name?: string }>((resolve) => {
-    window.FB?.api('/me', { fields: 'id,name,email' }, resolve);
-  });
-
-  if (!user.id || !user.email) {
-    throw new Error('Your Facebook account must provide an email address.');
-  }
-
-  return {
-    provider: 'facebook',
-    providerUserId: user.id,
     email: user.email,
     fullName: user.name ?? '',
   };
