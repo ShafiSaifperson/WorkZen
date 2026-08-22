@@ -432,5 +432,41 @@ export function normalizeResumeText(raw: string): string {
     formattedLines.push(line);
   }
 
-  return formattedLines.join('\n').trim();
+  // Second pass: Remove empty/orphan section headers (headers followed by another header or EOF with no items)
+  const cleaned: string[] = [];
+  for (let i = 0; i < formattedLines.length; i++) {
+    const line = formattedLines[i];
+    const upperClean = line.replace(/[^A-Z\s&]/g, '').trim();
+    const isHeader =
+      (KNOWN_SECTIONS.includes(upperClean) || KNOWN_SECTIONS.includes(line.toUpperCase())) &&
+      line.length < 40 &&
+      !line.includes('.') &&
+      !line.includes('@');
+
+    if (isHeader) {
+      let hasContent = false;
+      for (let j = i + 1; j < formattedLines.length; j++) {
+        const nextLine = formattedLines[j].trim();
+        if (!nextLine) continue;
+        const nextUpper = nextLine.replace(/[^A-Z\s&]/g, '').trim();
+        const nextIsHeader =
+          (KNOWN_SECTIONS.includes(nextUpper) || KNOWN_SECTIONS.includes(nextLine.toUpperCase())) &&
+          nextLine.length < 40 &&
+          !nextLine.includes('.') &&
+          !nextLine.includes('@');
+        if (!nextIsHeader) {
+          hasContent = true;
+        }
+        break;
+      }
+
+      if (!hasContent) {
+        continue;
+      }
+    }
+
+    cleaned.push(line);
+  }
+
+  return cleaned.join('\n').trim();
 }

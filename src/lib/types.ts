@@ -96,6 +96,7 @@ export interface ChatMessage {
   timestamp?: string;
   isReport?: boolean;
   action?: ChatAction;
+  suggestions?: AtsSuggestion[];
 }
 
 export interface AtsCategoryScore {
@@ -138,9 +139,16 @@ export interface ResumeAppliedChange {
   id: string;
   suggestionId: string;
   title: string;
+  actionType?: 'modify' | 'remove' | 'add';
   originalText: string;
   appliedText: string;
   appliedAt: string;
+  precedingLine?: string;
+  followingLine?: string;
+  exactAddedText?: string;
+  originalLineIndex?: number;
+  removedHeading?: string;
+  headingLineIndex?: number;
 }
 
 export interface ResumeData {

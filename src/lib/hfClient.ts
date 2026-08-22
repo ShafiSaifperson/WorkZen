@@ -504,7 +504,8 @@ export function analyzeResumeLocally(resumeText: string, targetRole: string): At
 // ---------------------------------------------------------------------------
 export async function analyzeResumeWithHF(
   resumeText: string,
-  targetRole: string = 'Software Engineer'
+  targetRole: string = 'Software Engineer',
+  previousSuggestions?: string[]
 ): Promise<AtsReport> {
   const apiKey = getStoredHfApiKey();
   const model = getStoredHfModel();
@@ -513,9 +514,14 @@ export async function analyzeResumeWithHF(
     return analyzeResumeLocally(resumeText, targetRole);
   }
 
-  const systemPrompt = `You are an Executive ATS (Applicant Tracking System) Scanner and Senior Technical Recruiter.
-Analyze the provided resume for the target role: "${targetRole}".
-Return ONLY a valid JSON object matching this exact TypeScript structure:
+  const avoidClause = previousSuggestions && previousSuggestions.length > 0
+    ? `\nCRITICAL: DO NOT suggest modifying or removing the following exact texts, you already suggested them:\n- "${previousSuggestions.join('"\n- "')}"\nFind DIFFERENT areas to improve.\n`
+    : '';
+
+  const systemPrompt = `You are an Executive ATS Scanner & Technical Recruiter.
+Analyze this resume for the role "${targetRole}".
+CRITICAL RULE: When making 'modify' or 'remove' suggestions, your changes must be impactful and operate at the FULL SENTENCE or FULL BULLET POINT level. NEVER suggest modifying just a single word or short phrase. The "originalText" MUST be an entire sentence or bullet point from the resume.${avoidClause}
+Return ONLY valid JSON matching this schema:
 {
   "overallScore": number (0-100),
   "targetRole": "${targetRole}",
@@ -550,9 +556,12 @@ Return ONLY a valid JSON object matching this exact TypeScript structure:
 }
 
 CRITICAL RULES FOR ALL SUGGESTIONS:
-1. "originalText" MUST BE A VERBATIM SUBSTRING QUOTE from the provided resume text.
-2. "suggestedRewrite" MUST BE THE FINAL RESUME TEXT, written in professional resume language using Google XYZ formula (Accomplished [X] as measured by [Y], by doing [Z]). NEVER put instructions like "Remove this" or "Rewrite this" in suggestedRewrite.
-3. If content should be deleted, set "actionType": "remove", set "originalText" to the exact string to delete, and set "suggestedRewrite": "".
+1. Suggest a balanced mix of ALL 3 action types:
+   - "modify" (Rewrites): Rewrite weak, passive, or metric-less bullet points into quantifiable Google XYZ formula achievements ("Accomplished [X] as measured by [Y], by doing [Z]"). Provide at least 1-2 impactful bullet rewrites.
+   - "add" (Additions): Suggest adding high-demand missing technical skills, keywords, or tools under the appropriate section.
+   - "remove" (Removals): Suggest removing obsolete, filler, or unprofessional lines (e.g. references available upon request, non-technical filler).
+2. "originalText" MUST BE A VERBATIM SUBSTRING QUOTE from the provided resume text. ALWAYS operate at the FULL SENTENCE or FULL BULLET POINT level. NEVER suggest modifying just a single word or short phrase. The "originalText" MUST be an entire sentence or bullet point.
+3. "suggestedRewrite" MUST BE THE FINAL RESUME TEXT, written in professional resume language using Google XYZ formula (Accomplished [X] as measured by [Y], by doing [Z]). If actionType is "remove", leave suggestedRewrite as empty string "".
 Do not include markdown codeblocks. Return raw JSON only.`;
 
   try {
@@ -625,7 +634,7 @@ Your Instructions:
   "sectionTarget": "Target section name if type is add"
 }
 \`\`\`
-4. "originalText" MUST be an exact quote from the user's current resume text so the system can locate and replace/remove it accurately.`;
+4. "originalText" MUST be an exact quote from the user's current resume text so the system can locate and replace/remove it accurately. ALWAYS operate at the FULL SENTENCE or FULL BULLET POINT level. NEVER suggest modifying just a single word or short phrase. The "originalText" MUST be an entire sentence or bullet point.`;
 
   try {
     const formattedMessages = [

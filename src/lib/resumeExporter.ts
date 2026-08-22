@@ -21,7 +21,7 @@ function triggerDownload(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
-const SECTION_HEADERS = [
+export const SECTION_HEADERS = [
   'OBJECTIVE',
   'CAREER OBJECTIVE',
   'SUMMARY',
@@ -55,10 +55,67 @@ const SECTION_HEADERS = [
   'LANGUAGES',
 ];
 
+export interface GhostAdditionOption {
+  text: string;
+  sectionTarget?: string;
+}
+
+export interface FormatResumeHtmlOptions {
+  targetText?: string | null;
+  appliedTexts?: string[];
+  ghostAddition?: GhostAdditionOption | null;
+}
+
 /**
- * Parses resume plain text into structured HTML elements (headers, contacts, sections, bullet lists).
+ * Checks if a given line is a recognized resume section header,
+ * and optionally whether it matches a target section name.
  */
-export function formatResumeToHtml(text: string): string {
+export function isMatchingSectionHeader(line: string, targetSection?: string): boolean {
+  if (!line || typeof line !== 'string') return false;
+  const cleanLine = line.trim();
+  if (!cleanLine || cleanLine.length > 60 || cleanLine.includes('@')) {
+    return false;
+  }
+
+  // Strip leading numbers/bullets like "1. SKILLS" or "• SKILLS"
+  const stripped = cleanLine.replace(/^[0-9•\-\*▪◦\u2022.\s]+/, '').trim();
+  const upperClean = stripped.replace(/[^A-Z\s&]/gi, '').trim().toUpperCase();
+  const rawUpper = stripped.toUpperCase();
+
+  const isHeader =
+    SECTION_HEADERS.includes(upperClean) ||
+    SECTION_HEADERS.includes(rawUpper) ||
+    SECTION_HEADERS.some((sh) => upperClean === sh || upperClean.startsWith(sh + ' ') || rawUpper.startsWith(sh + ' ') || upperClean.endsWith(' ' + sh));
+
+  if (!isHeader) return false;
+  if (!targetSection) return true;
+
+  const target = targetSection.toUpperCase().trim();
+  const tClean = target.replace(/[^A-Z]/g, '');
+  const hClean = upperClean.replace(/[^A-Z]/g, '');
+
+  if (hClean && tClean && (hClean.includes(tClean) || tClean.includes(hClean))) {
+    return true;
+  }
+
+  // Word-based match (e.g. target "SKILLS & PROFICIENCIES" matches header "TECHNICAL SKILLS" or "SKILLS")
+  const hWords = upperClean.split(/[^A-Z]+/).filter((w) => w.length > 2);
+  const tWords = target.split(/[^A-Z]+/).filter((w) => w.length > 2);
+
+  if (hWords.length > 0 && tWords.length > 0) {
+    if (hWords.some((hw) => tWords.some((tw) => hw === tw || hw.includes(tw) || tw.includes(hw)))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Parses resume plain text into structured HTML elements (headers, contacts, sections, bullet lists)
+ * with dynamic highlighting support for target/applied suggestions and in-place ghost additions.
+ */
+export function formatResumeToHtml(text: string, options?: FormatResumeHtmlOptions): string {
   const lines = text.split('\n').map((l) => l.trim());
   const htmlParts: string[] = [];
   let inBulletList = false;
@@ -71,6 +128,118 @@ export function formatResumeToHtml(text: string): string {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+
+  const cleanTarget = options?.targetText?.trim().replace(/^[•\-\*▪◦\u2022]\s*/, '').trim();
+  const cleanAppliedList = (options?.appliedTexts || [])
+    .map((t) => t.trim().replace(/^[•\-\*▪◦\u2022]\s*/, '').trim())
+    .filter(Boolean);
+
+  const ghostAddition = options?.ghostAddition;
+  let ghostInserted = false;
+
+  function renderGhostAdditionHtml(): string {
+    if (!ghostAddition || !ghostAddition.text) return '';
+    const cleanText = ghostAddition.text.trim();
+    const ghostBullets = cleanText
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((l) => l.replace(/^[•\-\*▪◦\u2022\u25CF\u25E6\u25AA\u2013\u2014\uF0B7]\s*/, ''));
+
+    return `
+<div id="resume-ghost-preview" class="not-prose resume-ghost-preview my-3.5 rounded-xl p-3.5 transition-all animate-pulse" style="border: 2px dashed #34d399 !important; background-color: rgba(6, 78, 59, 0.6) !important; color: #a7f3d0 !important; box-shadow: 0 0 25px rgba(16, 185, 129, 0.35) !important;">
+  <div class="flex items-center justify-between gap-2 border-b pb-1.5 mb-2 text-[10px] font-bold uppercase tracking-wider" style="border-bottom: 1px solid rgba(16, 185, 129, 0.4) !important; color: #6ee7b7 !important;">
+    <span class="flex items-center gap-1.5 font-bold" style="color: #6ee7b7 !important;">
+      <span class="inline-block h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+      ✨ Suggested Addition (Ghost Preview)
+    </span>
+    <span style="color: #6ee7b7 !important; background-color: rgba(16, 185, 129, 0.2) !important; border: 1px solid rgba(16, 185, 129, 0.4) !important;" class="text-[9px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded">Pending Confirmation</span>
+  </div>
+  <ul style="list-style-type: disc !important; padding-left: 1.25rem !important; margin: 0.5rem 0 !important; color: #ecfdf5 !important;">
+    ${ghostBullets.map((b) => `<li style="color: #ecfdf5 !important; font-size: 11px !important; line-height: 1.5 !important; margin: 4px 0 !important; font-weight: 600 !important;">${escapeHtml(b)}</li>`).join('')}
+  </ul>
+</div>`;
+  }
+
+  function highlightLine(lineContent: string): string {
+    const cleanLine = lineContent.trim();
+    if (!cleanLine) return escapeHtml(lineContent);
+
+    // Normalize text for comparison: remove all punctuation, extra whitespace, bullets
+    const normalize = (s: string) =>
+      s
+        .toLowerCase()
+        .replace(/^[0-9•\-\*▪◦\u2022\u25CF\u25E6\u25AA\u2013\u2014\uF0B7"'\s]+/, '')
+        .replace(/["'.,;:!?()]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    // 1. Target match (Active selected tile preview highlight - amber/gold glow)
+    if (cleanTarget && cleanTarget.length > 3) {
+      const normLine = normalize(cleanLine);
+      const normTarget = normalize(cleanTarget);
+
+      if (normLine && normTarget) {
+        // Direct substring check on raw lowercased text
+        const rawLowerLine = cleanLine.toLowerCase();
+        const rawLowerTarget = cleanTarget.toLowerCase();
+
+        if (rawLowerLine.includes(rawLowerTarget)) {
+          const idx = rawLowerLine.indexOf(rawLowerTarget);
+          const before = escapeHtml(cleanLine.slice(0, idx));
+          const match = escapeHtml(cleanLine.slice(idx, idx + cleanTarget.length));
+          const after = escapeHtml(cleanLine.slice(idx + cleanTarget.length));
+          return `${before}<mark id="resume-active-highlight" class="resume-target-highlight rounded bg-amber-500/30 text-amber-100 border border-amber-400/60 px-1.5 py-0.5 shadow-[0_0_15px_rgba(245,158,11,0.4)] ring-1 ring-amber-400/50 font-medium">${match}</mark>${after}`;
+        }
+
+        // Normalized line contains target
+        if (normLine.includes(normTarget)) {
+          return `<mark id="resume-active-highlight" class="resume-target-highlight rounded bg-amber-500/30 text-amber-100 border border-amber-400/60 px-1.5 py-0.5 shadow-[0_0_15px_rgba(245,158,11,0.4)] ring-1 ring-amber-400/50 font-medium">${escapeHtml(cleanLine)}</mark>`;
+        }
+
+        // Target contains line (for short section headers or trimmed lines)
+        if (normTarget.includes(normLine) && normLine.length >= 8) {
+          return `<mark id="resume-active-highlight" class="resume-target-highlight rounded bg-amber-500/30 text-amber-100 border border-amber-400/60 px-1.5 py-0.5 shadow-[0_0_15px_rgba(245,158,11,0.4)] ring-1 ring-amber-400/50 font-medium">${escapeHtml(cleanLine)}</mark>`;
+        }
+
+        // Strict Word-overlap fuzzy match: requires high similarity (at least 75% of target words, min 3 words)
+        const targetWords = normTarget.split(' ').filter((w) => w.length > 3);
+        if (targetWords.length >= 3) {
+          const matchedWords = targetWords.filter((w) => normLine.includes(w));
+          if (matchedWords.length / targetWords.length >= 0.75 && matchedWords.length >= 3) {
+            return `<mark id="resume-active-highlight" class="resume-target-highlight rounded bg-amber-500/30 text-amber-100 border border-amber-400/60 px-1.5 py-0.5 shadow-[0_0_15px_rgba(245,158,11,0.4)] ring-1 ring-amber-400/50 font-medium">${escapeHtml(cleanLine)}</mark>`;
+          }
+        }
+      }
+    }
+
+    // 2. Applied matches (Applied highlight - emerald/green glow)
+    for (const applied of cleanAppliedList) {
+      if (applied && applied.length > 2 && applied !== '(Deleted)') {
+        const normLine = normalize(cleanLine);
+        const normApplied = normalize(applied);
+
+        if (normLine && normApplied) {
+          const rawLowerLine = cleanLine.toLowerCase();
+          const rawLowerApplied = applied.toLowerCase();
+
+          if (rawLowerLine.includes(rawLowerApplied)) {
+            const idx = rawLowerLine.indexOf(rawLowerApplied);
+            const before = escapeHtml(cleanLine.slice(0, idx));
+            const match = escapeHtml(cleanLine.slice(idx, idx + applied.length));
+            const after = escapeHtml(cleanLine.slice(idx + applied.length));
+            return `${before}<mark id="resume-applied-highlight" class="resume-applied-highlight rounded bg-emerald-500/30 text-emerald-100 border border-emerald-400/60 px-1.5 py-0.5 shadow-[0_0_15px_rgba(16,185,129,0.4)] ring-1 ring-emerald-400/50 font-medium">${match}</mark>${after}`;
+          }
+
+          if (normLine.includes(normApplied) || normApplied.includes(normLine)) {
+            return `<mark id="resume-applied-highlight" class="resume-applied-highlight rounded bg-emerald-500/30 text-emerald-100 border border-emerald-400/60 px-1.5 py-0.5 shadow-[0_0_15px_rgba(16,185,129,0.4)] ring-1 ring-emerald-400/50 font-medium">${escapeHtml(cleanLine)}</mark>`;
+          }
+        }
+      }
+    }
+
+    return escapeHtml(lineContent);
+  }
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -85,7 +254,7 @@ export function formatResumeToHtml(text: string): string {
 
     // 1. Candidate Name (First non-empty line)
     if (isFirstLine && line.length < 50 && !line.includes('@') && !line.includes('|')) {
-      htmlParts.push(`<h1 class="resume-name">${escapeHtml(line)}</h1>`);
+      htmlParts.push(`<h1 class="resume-name">${highlightLine(line)}</h1>`);
       isFirstLine = false;
       continue;
     }
@@ -100,24 +269,43 @@ export function formatResumeToHtml(text: string): string {
         htmlParts.push('</ul>');
         inBulletList = false;
       }
-      htmlParts.push(`<div class="resume-contact">${escapeHtml(line)}</div>`);
+      htmlParts.push(`<div class="resume-contact">${highlightLine(line)}</div>`);
       continue;
     }
 
-    // 3. Section Header (Matches KNOWN_SECTIONS or all uppercase header)
-    const upperClean = line.replace(/[^A-Z\s&]/g, '').trim();
-    const isSectionHeader =
-      (SECTION_HEADERS.includes(upperClean) || SECTION_HEADERS.includes(line.toUpperCase())) &&
-      line.length < 40 &&
-      !line.includes('.') &&
-      !line.includes('@');
+    // 3. Section Header (Matches KNOWN_SECTIONS or standard header)
+    if (isMatchingSectionHeader(line)) {
+      const isGhostTarget =
+        Boolean(ghostAddition) &&
+        !ghostInserted &&
+        isMatchingSectionHeader(line, ghostAddition?.sectionTarget || 'SKILLS');
 
-    if (isSectionHeader) {
+      // Check if there is any content under this section
+      let hasSectionContent = false;
+      for (let j = i + 1; j < lines.length; j++) {
+        const nextL = lines[j].trim();
+        if (!nextL) continue;
+        if (isMatchingSectionHeader(nextL)) break;
+        hasSectionContent = true;
+        break;
+      }
+
+      if (!hasSectionContent && !isGhostTarget) {
+        // Skip empty header that has no content and no ghost addition
+        continue;
+      }
+
       if (inBulletList) {
         htmlParts.push('</ul>');
         inBulletList = false;
       }
-      htmlParts.push(`<h2 class="resume-section-header">${escapeHtml(line.toUpperCase())}</h2>`);
+      htmlParts.push(`<h2 class="resume-section-header">${highlightLine(line.toUpperCase())}</h2>`);
+
+      // If this section header matches the ghost target section, insert ghost preview directly below this header!
+      if (isGhostTarget) {
+        htmlParts.push(renderGhostAdditionHtml());
+        ghostInserted = true;
+      }
       continue;
     }
 
@@ -128,7 +316,7 @@ export function formatResumeToHtml(text: string): string {
         inBulletList = true;
       }
       const bulletContent = line.replace(/^[•\-\*▪◦\u2022\u25CF\u25E6\u25AA\u2013\u2014\uF0B7]\s*/, '');
-      htmlParts.push(`<li>${escapeHtml(bulletContent)}</li>`);
+      htmlParts.push(`<li>${highlightLine(bulletContent)}</li>`);
       continue;
     }
 
@@ -139,10 +327,20 @@ export function formatResumeToHtml(text: string): string {
     }
 
     if (line.includes('|') || /\b(20\d\d|19\d\d|present|recently|sometime)\b/i.test(line)) {
-      htmlParts.push(`<div class="resume-job-header">${escapeHtml(line)}</div>`);
+      htmlParts.push(`<div class="resume-job-header">${highlightLine(line)}</div>`);
     } else {
-      htmlParts.push(`<p class="resume-paragraph">${escapeHtml(line)}</p>`);
+      htmlParts.push(`<p class="resume-paragraph">${highlightLine(line)}</p>`);
     }
+  }
+
+  // Fallback: If ghostAddition exists but no matching section was found, render it before closing
+  if (ghostAddition && !ghostInserted) {
+    if (inBulletList) {
+      htmlParts.push('</ul>');
+      inBulletList = false;
+    }
+    htmlParts.push(renderGhostAdditionHtml());
+    ghostInserted = true;
   }
 
   if (inBulletList) {
