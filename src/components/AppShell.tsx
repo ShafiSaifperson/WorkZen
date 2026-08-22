@@ -306,7 +306,7 @@ export function AppShell({ user, onSignOut }: AppShellProps) {
                 {profileMenuOpen && (
                   <div
                     role="menu"
-                    className="absolute right-0 top-full z-50 mt-2 w-56 max-w-[calc(100vw-1.5rem)] rounded-2xl border border-[#2B3558] bg-[#181A2F]/98 backdrop-blur-xl p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.6)] animate-scale-in"
+                    className="absolute right-0 top-full z-50 mt-2 w-56 max-w-[calc(100vw-1.5rem)] rounded-2xl border border-[#2B3558] bg-[#181A2F] p-1.5 shadow-[0_16px_48px_rgba(0,0,0,0.85)] animate-scale-in"
                   >
                     <div className="px-3 py-2 border-b border-[#242E49] mb-1">
                       <p className="text-xs font-semibold text-white truncate">{fullName || 'User'}</p>
@@ -392,7 +392,7 @@ export function AppShell({ user, onSignOut }: AppShellProps) {
 
         {/* Mobile Navigation Drawer */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-[#242E49] bg-[#111427]/98 px-4 py-4 space-y-3 animate-fade-in">
+          <div className="md:hidden border-t border-[#242E49] bg-[#111427] px-4 py-4 space-y-3 animate-fade-in">
             <form onSubmit={submitSearch} className="relative w-full">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
